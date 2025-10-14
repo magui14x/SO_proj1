@@ -116,14 +116,79 @@ return 0
 # Returns: 0 on success
 #################################################
 list_recycled() {
-  # TODO: Implement this function
+  local sort_by="${1:-date}"  # Default: ordena por data
+
   echo "=== Recycle Bin Contents ==="
 
-  # Your code here
-  # Hint: Read metadata file and format output
-  # Hint: Use printf for formatted table
-  # Hint: Skip header line
+  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then #f- se existe s- se tem tamanho
+      echo "Recycle bin is empty"
+      return 0
+  fi
 
+  local total_items=$(($(wc -l < "$METADATA_FILE") - 1))  #total de linhas - 1 (do header)
+
+  if [ "$total_items" -eq 0 ]; then #sem o header esta vazio?
+      echo "Recycle bin is empty"
+      return 0
+  fi
+
+  # Print header
+  printf "%-18s %-20s %-30s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
+  printf "%-18s %-20s %-30s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
+
+  # Calcular total_size ANTES do loop (fora do subshell)
+  local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
+  
+  # ORDENAÇÃO: Processar com sorting baseado no parâmetro
+  case "$sort_by" in
+      "name")
+          # Ordenar por nome (coluna 2)
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
+      "size")
+          # Ordenar por tamanho (coluna 5) numericamente
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
+      "date"|*)
+          # Ordenar por data (coluna 4) - default
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
+  esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
+      # remove os espacos tr -d
+      id=$(echo "$id" | tr -d ' ')
+      name=$(echo "$name" | tr -d ' ')
+      path=$(echo "$path" | tr -d ' ')
+      deletion_date=$(echo "$deletion_date" | tr -d ' ')
+      size=$(echo "$size" | tr -d ' ')
+
+      # converte o tamanho para humano
+      local size_human=""
+      if [ "$size" -lt 1024 ]; then
+          size_human="${size}B"
+      elif [ "$size" -lt 1048576 ]; then
+          size_human="$(echo "scale=1; $size/1024" | bc) KB"
+      else
+          size_human="$(echo "scale=1; $size/1048576" | bc) MB"
+      fi
+
+      local display_id="${id:0:15}.." #so coloca os primeiros 15 caracteres e depois...
+      local display_name="${name:0:18}.."
+      local display_path="${path:0:28}.."
+
+      printf "%-18s %-20s %-30s %-20s %-10s\n" "$display_id" "$display_name" "$display_path" "$deletion_date" "$size_human"
+  done
+
+  echo ""
+  echo "Total items: $total_items"
+  
+  # formatar o total_size também para humano
+  local total_size_human=""
+  if [ "$total_size" -lt 1048576 ]; then
+      total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
+  else
+      total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
+  fi
+  
+  echo "Total size: $total_size_human"
+  echo "Sorted by: $sort_by"
+  
   return 0
 }
 
