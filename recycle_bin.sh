@@ -116,18 +116,19 @@ return 0
 # Returns: 0 on success
 #################################################
 list_recycled() {
-  local sort_by="${1:-date}"  # Default: ordena por data
+  # Usar variável de ambiente para sorting, default é "date"
+  local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
 
   echo "=== Recycle Bin Contents ==="
 
-  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then #f- se existe s- se tem tamanho
+  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
       echo "Recycle bin is empty"
       return 0
   fi
 
-  local total_items=$(($(wc -l < "$METADATA_FILE") - 1))  #total de linhas - 1 (do header)
+  local total_items=$(($(wc -l < "$METADATA_FILE") - 1))
 
-  if [ "$total_items" -eq 0 ]; then #sem o header esta vazio?
+  if [ "$total_items" -eq 0 ]; then
       echo "Recycle bin is empty"
       return 0
   fi
@@ -136,19 +137,16 @@ list_recycled() {
   printf "%-18s %-20s %-30s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
   printf "%-18s %-20s %-30s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
 
-  # Calcular total_size ANTES do loop (fora do subshell)
+  # Calcular total_size ANTES do loop
   local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
   
-  # ORDENAÇÃO: Processar com sorting baseado no parâmetro
+  # ORDENAÇÃO baseada na variável de ambiente
   case "$sort_by" in
       "name")
-          # Ordenar por nome (coluna 2)
           tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
       "size")
-          # Ordenar por tamanho (coluna 5) numericamente
           tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
       "date"|*)
-          # Ordenar por data (coluna 4) - default
           tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
   esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
       # remove os espacos tr -d
@@ -168,7 +166,7 @@ list_recycled() {
           size_human="$(echo "scale=1; $size/1048576" | bc) MB"
       fi
 
-      local display_id="${id:0:15}.." #so coloca os primeiros 15 caracteres e depois...
+      local display_id="${id:0:15}.."
       local display_name="${name:0:18}.."
       local display_path="${path:0:28}.."
 
@@ -188,6 +186,11 @@ list_recycled() {
   
   echo "Total size: $total_size_human"
   echo "Sorted by: $sort_by"
+  echo ""
+  echo "To change sorting, use:"
+  echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
+  echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
+  echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
   
   return 0
 }
