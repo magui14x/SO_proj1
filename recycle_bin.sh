@@ -95,9 +95,9 @@ for file_path in "$@"; do
         owner=$(stat -c "%U:%G" "$FILES_DIR/$new_name")
 
     #Append METADATA no diretório recycle bin.
-    echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "METADATA_FILE" # Name, size, permissions, owner
+    echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE" # Name, size, permissions, owner
     echo -e "${GREEN}File '$file_path' moved to recycle bin as '$new_name'${NC}"
-done
+  done
    
     
 # Your code here
@@ -125,7 +125,7 @@ list_recycled() {
       return 0
   fi
 
-  local total_items=$(($(wc -l < "$METADATA_FILE") - 1))  #total de linhas - 1 (do header)
+  local total_items=$(($(wc -l < "$METADATA_FILE") - 2))  #total de linhas - 1 (do header)
 
   if [ "$total_items" -eq 0 ]; then #sem o header esta vazio?
       echo "Recycle bin is empty"
@@ -133,8 +133,8 @@ list_recycled() {
   fi
 
   # Print header
-  printf "%-18s %-20s %-30s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
-  printf "%-18s %-20s %-30s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
+  printf "%-18s %-20s %-50s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
+  printf "%-18s %-20s %-50s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
 
   # Calcular total_size ANTES do loop (fora do subshell)
   local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
@@ -151,12 +151,19 @@ list_recycled() {
           # Ordenar por data (coluna 4) - default
           tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
   esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
+    if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
+      continue
+    fi
       # remove os espacos tr -d
       id=$(echo "$id" | tr -d ' ')
       name=$(echo "$name" | tr -d ' ')
       path=$(echo "$path" | tr -d ' ')
       deletion_date=$(echo "$deletion_date" | tr -d ' ')
       size=$(echo "$size" | tr -d ' ')
+
+      if ! [[ "$size" =~ ^[0-9]+$ ]]; then
+        size=0
+      fi
 
       # converte o tamanho para humano
       local size_human=""
@@ -170,10 +177,11 @@ list_recycled() {
 
       local display_id="${id:0:15}.." #so coloca os primeiros 15 caracteres e depois...
       local display_name="${name:0:18}.."
-      local display_path="${path:0:28}.."
+      
 
-      printf "%-18s %-20s %-30s %-20s %-10s\n" "$display_id" "$display_name" "$display_path" "$deletion_date" "$size_human"
+      printf "%-18s %-20s %-50s %-20s %-10s\n" "$display_id" "$display_name" "$path" "$deletion_date" "$size_human"
   done
+  cat -A "$METADATA_FILE"
 
   echo ""
   echo "Total items: $total_items"
