@@ -210,22 +210,215 @@ list_recycled() {
 # Returns: 0 on success, 1 on failure
 #################################################
 restore_file() {
-  # TODO: Implement this function
-  local file_id="$1"
+    local search_term="$1"
+    
+    echo "=== DEBUG RESTORE ==="
+    echo "Searching for: '$search_term'"
+    
+    if [ -z "$search_term" ]; then
+        echo -e "${RED}Error: No file ID or filename specified${NC}"
+        return 1
+    fi
 
-  if [ -z "$file_id" ]; then
-    echo -e "${RED}Error: No file ID specified${NC}"
-    return 1
-  fi
+    # Verificar se o metadata file existe
+    if [ ! -f "$METADATA_FILE" ]; then
+        echo -e "${RED}Error: Recycle bin is not initialized${NC}"
+        return 1
+    fi
 
-  # Your code here
-  # Hint: Search metadata for matching ID
-  # Hint: Get original path from metadata
-  # Hint: Check if original path exists
-  # Hint: Move file back and restore permissions
-  # Hint: Remove entry from metadata
+    if [ ! -s "$METADATA_FILE" ]; then
+        echo -e "${RED}Error: Recycle bin is empty${NC}"
+        return 1
+    fi
 
-  return 0
+    # MOSTRAR TODAS AS ENTRADAS DISPONÍVEIS
+    echo "=== ALL AVAILABLE FILES IN RECYCLE BIN ==="
+    echo "Metadata file: $METADATA_FILE"
+    echo ""
+    
+    # Header
+    printf "%-20s %-25s %-30s\n" "ID" "FILENAME" "ORIGINAL PATH"
+    printf "%-20s %-25s %-30s\n" "---" "--------" "-------------"
+    
+    # Listar todas as entradas
+    tail -n +2 "$METADATA_FILE" | while IFS=',' read -r id name path rest; do
+        # Limpar campos
+        id=$(echo "$id" | tr -d '[:space:]')
+        name=$(echo "$name" | tr -d '[:space:]')
+        path=$(echo "$path" | tr -d '[:space:]')
+        
+        printf "%-20s %-25s %-30s\n" "$id" "$name" "$path"
+    done
+    
+    echo ""
+    echo "=== SEARCH RESULTS ==="
+    
+    # Procurar de forma mais flexível
+    local metadata_entry
+    metadata_entry=$(grep -i "$search_term" "$METADATA_FILE" | grep -v "^#")
+    
+    if [ -z "$metadata_entry" ]; then
+        echo -e "${RED}Error: No file found matching '$search_term'${NC}"
+        echo ""
+        echo "Tips:"
+        echo "• Use './recycle_bin.sh list' to see all files"
+        echo "• Use the exact ID from the list above"
+        echo "• Or use part of the filename"
+        return 1
+    fi
+    
+    echo "Found entries:"
+    echo "$metadata_entry"
+    echo ""
+    
+    # Se encontrar múltiplas entradas, usar a primeira
+    if [ $(echo "$metadata_entry" | wc -l) -gt 1 ]; then
+        echo -e "${YELLOW}Multiple files found. Using the first one.${NC}"
+        metadata_entry=$(echo "$metadata_entry" | head -n 1)
+    fi
+    
+    echo "Using entry: $metadata_entry"
+    echo ""
+
+    # Parse metadata fields
+    local id original_name original_path deletion_date file_size file_type permissions owner
+    IFS=',' read -r id original_name original_path deletion_date file_size file_type permissions owner <<< "$metadata_entry"
+    
+    # Clean up fields
+    file_type=$(echo "$file_type" | sed 's/^"//;s/"$//')
+    original_name=$(echo "$original_name" | tr -d '[:space:]')
+    original_path=$(echo "$original_path" | tr -d '[:space:]')
+    id=$(echo "$id" | tr -d '[:space:]')
+
+    echo "File details:"
+    echo "• ID: $id"
+    echo "• Name: $original_name"
+    echo "• Original path: $original_path"
+    echo "• Deleted: $deletion_date"
+    echo "• Size: $file_size bytes"
+    echo "• Permissions: $permissions"
+    echo ""
+
+    # Find the actual file in recycle bin
+    local recycled_file
+    recycled_file=$(find "$FILES_DIR" -name "*_${id}" -type f 2>/dev/null | head -n 1)
+    
+    if [ -z "$recycled_file" ]; then
+        echo -e "${RED}Error: Physical file not found in recycle bin${NC}"
+        echo "Looking for pattern: '*_${id}'"
+        echo "Files in recycle bin:"
+        ls -la "$FILES_DIR/" 2>/dev/null || echo "Files directory not found"
+        return 1
+    fi
+
+    echo "Physical file found: $recycled_file"
+    echo ""
+
+    # Check if original directory exists
+    local original_dir
+    original_dir=$(dirname "$original_path")
+    
+    if [ ! -d "$original_dir" ]; then
+        echo -e "${YELLOW}Warning: Original directory '$original_dir' no longer exists${NC}"
+        read -p "Create directory? [y/N]: " create_dir
+        if [[ "$create_dir" =~ ^[Yy]$ ]]; then
+            if ! mkdir -p "$original_dir" 2>/dev/null; then
+                echo -e "${RED}Error: Failed to create directory '$original_dir'${NC}"
+                return 1
+            fi
+            echo -e "${GREEN}Directory created successfully${NC}"
+        else
+            echo "Restoration cancelled"
+            return 1
+        fi
+    fi
+
+    # Handle file existence conflicts
+    local final_destination="$original_path"
+    if [ -e "$original_path" ]; then
+        echo -e "${YELLOW}Warning: A file already exists at '$original_path'${NC}"
+        echo "Choose an option:"
+        echo "1) Overwrite existing file"
+        echo "2) Restore with modified name (append timestamp)"
+        echo "3) Cancel operation"
+        
+        local choice
+        while true; do
+            read -p "Enter your choice [1-3]: " choice
+            case "$choice" in
+                1)
+                    if ! rm -f "$original_path" 2>/dev/null; then
+                        echo -e "${RED}Error: Cannot overwrite file. Permission denied.${NC}"
+                        return 1
+                    fi
+                    echo "Overwriting existing file..."
+                    ;;
+                2)
+                    local timestamp
+                    timestamp=$(date +%Y%m%d_%H%M%S)
+                    local base_name
+                    base_name=$(basename "$original_path")
+                    local extension=""
+                    
+                    # Handle files with extensions
+                    if [[ "$base_name" =~ ^(.+)\.([^.]+)$ ]]; then
+                        base_name="${BASH_REMATCH[1]}"
+                        extension=".${BASH_REMATCH[2]}"
+                    fi
+                    
+                    final_destination="$(dirname "$original_path")/${base_name}_restored_${timestamp}${extension}"
+                    echo "Will restore as: $(basename "$final_destination")"
+                    ;;
+                3)
+                    echo "Restoration cancelled"
+                    return 1
+                    ;;
+                *)
+                    echo "Invalid choice. Please enter 1, 2, or 3."
+                    ;;
+            esac
+            [[ "$choice" =~ ^[123]$ ]] && break
+        done
+    fi
+
+    # Attempt to restore the file
+    echo "Restoring file to: $final_destination"
+    
+    if ! mv "$recycled_file" "$final_destination" 2>/dev/null; then
+        echo -e "${RED}Error: Failed to move file to destination${NC}"
+        echo "Check permissions and try again"
+        return 1
+    fi
+
+    # Restore original permissions
+    if [ -n "$permissions" ] && [[ "$permissions" =~ ^[0-7]+$ ]]; then
+        if chmod "$permissions" "$final_destination" 2>/dev/null; then
+            echo -e "${GREEN}Permissions restored to $permissions${NC}"
+        else
+            echo -e "${YELLOW}Warning: Could not restore permissions (may require root)${NC}"
+        fi
+    fi
+
+    # Remove entry from metadata
+    local temp_file
+    temp_file=$(mktemp)
+    if grep -v "^$id," "$METADATA_FILE" > "$temp_file" 2>/dev/null; then
+        mv "$temp_file" "$METADATA_FILE"
+        echo -e "${GREEN}Metadata updated${NC}"
+    else
+        echo -e "${YELLOW}Warning: Could not update metadata file${NC}"
+        rm -f "$temp_file"
+    fi
+
+    # Log the restoration
+    local log_entry
+    log_entry="$(date '+%Y-%m-%d %H:%M:%S') - RESTORED: $original_name from $id to $final_destination"
+    echo "$log_entry" >> "$RECYCLE_BIN_DIR/restoration.log"
+    
+    echo -e "${GREEN}File successfully restored to: $final_destination${NC}"
+    echo "Restoration completed and logged"
+
+    return 0
 }
 
 #################################################
