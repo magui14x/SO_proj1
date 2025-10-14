@@ -6,7 +6,7 @@
 #################################################
 
 # Global Configuration
-RECYCLE_BIN_DIR="$HOME/.recycle_bin"
+RECYCLE_BIN_DIR="$HOME/recycle_bin"
 FILES_DIR="$RECYCLE_BIN_DIR/files"
 METADATA_FILE="$RECYCLE_BIN_DIR/metadata.db"
 CONFIG_FILE="$RECYCLE_BIN_DIR/config"
@@ -57,26 +57,56 @@ delete_file() {
   # TODO: Implement this function
   local file_path="$1"
 
-  # Validate input
-  if [ -z "$file_path" ]; then
-    echo -e "${RED}Error: No file specified${NC}"
-    return 1
-  fi
+# TODO: Implement this function
+local file_path="$1"
 
-  # Check if file exists
-  if [ ! -e "$file_path" ]; then
-    echo -e "${RED}Error: File '$file_path' does not exist${NC}"
-    return 1
-  fi
+# Validate input
+if [ -z "$file_path" ]; then
+echo -e "${RED}Error: No file specified${NC}"
+return 1
+fi
+for file_path in "$@"; do
+# Check if file exists
+    if [ ! -e "$file_path" ]; then
+        echo -e "${RED}Error: File '$file_path' does not exist${NC}"
+        return 1
+    fi
+    
+    local base_name
+    base_name=$(basename "$file_path")
+    local ID
+    ID=$(generate_unique_id)
+    local new_name="${base_name}_${ID}"
+    local deletion_date
+    deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
 
-  # Your code here
-  # Hint: Get file metadata using stat command
-  # Hint: Generate unique ID
-  # Hint: Move file to FILES_DIR with unique ID
-  # Hint: Add entry to metadata file
+    mv "$file_path" "$FILES_DIR/$new_name"
 
-  echo "Delete function called with: $file_path"
-  return 0
+        # Obter metadados using stat and file commands
+        local original_path
+        original_path=$(realpath "$file_path")
+        local file_size
+        file_size=$(stat -c "%s" "$FILES_DIR/$new_name")
+        local file_type
+        file_type=$(file -b "$FILES_DIR/$new_name")
+        local permissions
+        permissions=$(stat -c "%a" "$FILES_DIR/$new_name")
+        local owner
+        owner=$(stat -c "%U:%G" "$FILES_DIR/$new_name")
+
+    #Append METADATA no diretório recycle bin.
+    echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "METADATA_FILE" # Name, size, permissions, owner
+    echo -e "${GREEN}File '$file_path' moved to recycle bin as '$new_name'${NC}"
+done
+   
+    
+# Your code here
+# Hint: Get file metadata using stat command
+# Hint: Generate unique ID
+# Hint: Move file to FILES_DIR with unique ID
+# Hint: Add entry to metadata file
+echo "Delete function called with: $file_path"
+return 0
 }
 
 #################################################
