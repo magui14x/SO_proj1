@@ -115,92 +115,95 @@ return 0
 # Parameters: None
 # Returns: 0 on success
 #################################################
-list_recycled() {
-  # Usar variável de ambiente para sorting, default é "date"
-  local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
+  list_recycled() {
+    # Usar variável de ambiente para sorting, default é "date"
+    local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
 
-  echo "=== Recycle Bin Contents ==="
+    echo "=== Recycle Bin Contents ==="
 
-  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
-      echo "Recycle bin is empty"
-      return 0
-  fi
-
-  local total_items=$(($(wc -l < "$METADATA_FILE") - 2))  #total de linhas - 1 (do header)
-
-  if [ "$total_items" -eq 0 ]; then
-      echo "Recycle bin is empty"
-      return 0
-  fi
-
-  # Print header
-  printf "%-18s %-20s %-50s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
-  printf "%-18s %-20s %-50s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
-
-  # Calcular total_size ANTES do loop
-  local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
-  
-  # ORDENAÇÃO baseada na variável de ambiente
-  case "$sort_by" in
-      "name")
-          tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
-      "size")
-          tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
-      "date"|*)
-          tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
-  esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
-    if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
-      continue
+    if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
+        echo "Recycle bin is empty"
+        return 0
     fi
-      # remove os espacos tr -d
-      id=$(echo "$id" | tr -d ' ')
-      name=$(echo "$name" | tr -d ' ')
-      path=$(echo "$path" | tr -d ' ')
-      deletion_date=$(echo "$deletion_date" | tr -d ' ')
-      size=$(echo "$size" | tr -d ' ')
 
-      if ! [[ "$size" =~ ^[0-9]+$ ]]; then
+    local total_items=$(($(wc -l < "$METADATA_FILE") - 2))  #total de linhas - 1 (do header)
+
+    if [ "$total_items" -eq 0 ]; then
+        echo "Recycle bin is empty"
+        return 0
+    fi
+
+    # Print header
+    printf "%-18s %-20s %-50s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
+    printf "%-18s %-20s %-50s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
+
+    # Calcular total_size ANTES do loop
+    local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
+    
+    
+    # ORDENAÇÃO baseada na variável de ambiente
+    case "$sort_by" in
+        "name")
+            tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
+        "size")
+            tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
+        "date"|*)
+            tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
+    esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
+      if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
         continue
       fi
+        # remove os espacos tr -d
+        id=$(echo "$id" | tr -d ' ')
+        name=$(echo "$name" | tr -d ' ')
+        path=$(echo "$path" | tr -d ' ')
+        deletion_date=$(echo "$deletion_date" | tr -d ' ')
+        size=$(echo "$size" | tr -d ' ')
 
-      # converte o tamanho para humano
-      local size_human=""
-      if [ "$size" -lt 1024 ]; then
-          size_human="${size}B"
-      elif [ "$size" -lt 1048576 ]; then
-          size_human="$(echo "scale=1; $size/1024" | bc) KB"
-      else
-          size_human="$(echo "scale=1; $size/1048576" | bc) MB"
-      fi
+        if ! [[ "$size" =~ ^[0-9]+$ ]]; then
+          continue  
+        fi
 
-      local display_id="${id:0:15}.."
-      local display_name="${name:0:18}.."
-      
+        # converte o tamanho para humano
+        local size_human=""
+        if [ "$size" -lt 1024 ]; then
+            size_human="${size}B"
+        elif [ "$size" -lt 1048576 ]; then
+            size_human="$(echo "scale=1; $size/1024" | bc) KB"
+        else
+            size_human="$(echo "scale=1; $size/1048576" | bc) MB"
+        fi
 
-      printf "%-18s %-20s %-50s %-20s %-10s\n" "$display_id" "$display_name" "$path" "$deletion_date" "$size_human"
-  done
-  
-  echo ""
-  echo "Total items: $total_items"
-  
-  # formatar o total_size também para humano
-  local total_size_human=""
-  if [ "$total_size" -lt 1048576 ]; then
-      total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
-  else
-      total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
-  fi
-  
-  echo "Total size: $total_size_human"
-  echo "Sorted by: $sort_by"
-  echo ""
-  echo "To change sorting, use:"
-  echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
-  echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
-  echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
-  
-  return 0
-}
+        local display_id="${id:0:15}.."
+        local display_name="${name:0:18}.."
+        
+
+        printf "%-18s %-20s %-50s %-20s %-10s\n" "$display_id" "$display_name" "$path" "$deletion_date" "$size_human"
+    done
+    
+    echo ""
+    echo "Total items: $total_items"
+    
+    # formatar o total_size também para humano
+    local total_size_human=""
+    if [ "$total_size" -lt 1024 ]; then
+        total_size_human="${total_size}B"
+    elif [ "$total_size" -lt 1048576 ]; then
+        total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
+    else
+        total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
+    fi
+    
+    echo "Total size: $total_size_human"
+    echo "Sorted by: $sort_by"
+    echo ""
+    echo "To change sorting, use:"
+    echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
+    echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
+    echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
+    
+    return 0
+  }
 
 #################################################
 # Function: restore_file
