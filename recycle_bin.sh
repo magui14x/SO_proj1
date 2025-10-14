@@ -160,7 +160,7 @@ list_recycled() {
       size=$(echo "$size" | tr -d ' ')
 
       if ! [[ "$size" =~ ^[0-9]+$ ]]; then
-        size=0
+        continue
       fi
 
       # converte o tamanho para humano
@@ -179,8 +179,7 @@ list_recycled() {
 
       printf "%-18s %-20s %-50s %-20s %-10s\n" "$display_id" "$display_name" "$path" "$deletion_date" "$size_human"
   done
-  cat -A "$METADATA_FILE"
-
+  
   echo ""
   echo "Total items: $total_items"
   
