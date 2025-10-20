@@ -55,9 +55,6 @@ generate_unique_id() {
 #################################################
 delete_file() {
   # TODO: Implement this function
-  local file_path="$1"
-
-# TODO: Implement this function
 local file_path="$1"
 
 # Validate input
@@ -65,6 +62,11 @@ if [ -z "$file_path" ]; then
 echo -e "${RED}Error: No file specified${NC}"
 return 1
 fi
+if [ "$(basename "$file_path")" == "recycle_bin.sh" ]; then
+  echo "You can't erase this file. "
+  exit 1;
+fi
+
 for file_path in "$@"; do
 # Check if file exists
     if [ ! -e "$file_path" ]; then
@@ -431,7 +433,19 @@ restore_file() {
 #################################################
 empty_recyclebin() {
   # TODO: Implement this function
-
+  echo "Mark, Are you sure? Type yes to erase the files. "
+  read  
+    if [[ "$REPLY" == "yes" ]]; then
+  for  file in $FILES_DIR/*; do
+    rm $file
+  done
+  echo "All files have been deleted. "
+  echo "# Recycle Bin Metadata" > "$METADATA_FILE"
+  echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" >> "$METADATA_FILE"
+  else 
+  echo "Operation canceled. Exiting... "
+  exit 1
+  fi 
   # Your code here
   # Hint: Ask for confirmation
   # Hint: Delete all files in FILES_DIR
