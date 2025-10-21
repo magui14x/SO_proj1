@@ -65,6 +65,13 @@ fi
 if [ "$(basename "$file_path")" == "recycle_bin.sh" ]; then
   echo "You can't erase this file. "
   exit 1;
+
+fi
+
+if [[ -d "$file_path" ]]; then
+  find "$file_path" -mindepth 1 | while read -r sub_item; do
+  delete_file "$sub_item"
+  done
 fi
 
 for file_path in "$@"; do
@@ -433,11 +440,16 @@ restore_file() {
 #################################################
 empty_recyclebin() {
   # TODO: Implement this function
-  echo "Mark, Are you sure? Type yes to erase the files. "
-  read  
+  local deletionFile="$1" 
+  local index=1
+  matches=()
+
+  if [[ -z "$deletionFile" ]];then #Checks for arguments. If it doesn't have any args it will ask to delete everything.
+  echo "Are you sure? Type yes to erase all the files. "
+  read  -r REPLY
     if [[ "$REPLY" == "yes" ]]; then
   for  file in $FILES_DIR/*; do
-    rm $file
+    rm -rf $file
   done
   echo "All files have been deleted. "
   echo "# Recycle Bin Metadata" > "$METADATA_FILE"
@@ -445,7 +457,42 @@ empty_recyclebin() {
   else 
   echo "Operation canceled. Exiting... "
   exit 1
-  fi 
+  fi
+  else
+
+  while IFS=',' read -r id name path date size type perms owner; do
+  matches+=("$id,$name,$path,$date,$size,$type,$perms,$owner")
+    echo "[$index] ID: $id | Name: $name | Deleted on: $date | Size: ${size}B | Type: $type"
+    ((index++))
+  done < <(grep ",$deletionFile," "$METADATA_FILE" )
+
+   if [ "${#matches[@]}" -eq 0 ]; then
+      echo "No matching files found."
+      return 1
+    fi
+
+  echo "Choose the index of the file you want to delete. Anything else to cancel. "
+  read -r selection
+
+  if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#matches[@]}" ]; then
+    echo "Invalid selection."
+    return 1
+  fi
+
+  selected="${matches[$((selection-1))]}"
+  IFS=',' read -r id name path date size type perms owner <<< "$selected"
+    
+  local full_name="${name}_${id}"
+  local full_path="$FILES_DIR/$full_name"
+  if [ -e "$full_path" ]; then
+    rm -rf "$full_path"
+    grep -v "$id" "$METADATA_FILE" > "$METADATA_FILE.tmp" && mv "$METADATA_FILE.tmp" "$METADATA_FILE" 
+  fi
+  echo "The file : "$deletionFile" with the ID: "${id}", has been deleted. "
+  return 1
+  fi
+ 
+
   # Your code here
   # Hint: Ask for confirmation
   # Hint: Delete all files in FILES_DIR
@@ -528,7 +575,7 @@ main() {
       search_recycled "$2"
       ;;
     empty)
-      empty_recyclebin
+      empty_recyclebin "$2"
       ;;
     help|--help|-h)
       display_help
