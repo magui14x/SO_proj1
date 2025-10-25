@@ -30,6 +30,7 @@ initialize_recyclebin() {
     echo "# Recycle Bin Metadata" > "$METADATA_FILE"
     echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" >> "$METADATA_FILE"
     echo "Recycle bin initialized at $RECYCLE_BIN_DIR"
+    echo "AUTO_CLEANUP_DAYS=30" > "$CONFIG_FILE"
     return 0
   fi
   return 0
@@ -62,10 +63,11 @@ if [ -z "$file_path" ]; then
 echo -e "${RED}Error: No file specified${NC}"
 return 1
 fi
-if [ "$(basename "$file_path")" == "recycle_bin.sh" ]; then
-  echo "You can't erase this file. "
-  exit 1;
 
+
+if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
+  echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"
+  return 1
 fi
 
 if [[ -d "$file_path" ]]; then
@@ -77,7 +79,7 @@ fi
 for file_path in "$@"; do
 # Check if file exists
     if [ ! -e "$file_path" ]; then
-        echo -e "${RED}Error: File '$file_path' does not exist${NC}"
+        echo -e "${RED}Error: '$file_path' does not exist${NC}"
         return 1
     fi
     
@@ -88,6 +90,9 @@ for file_path in "$@"; do
     local new_name="${base_name}_${ID}"
     local deletion_date
     deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
+    local original_permissions
+    original_permissions=$(stat -c "%a" "$FILES_DIR/$new_name")
+
 
     mv "$file_path" "$FILES_DIR/$new_name"
 
@@ -105,7 +110,7 @@ for file_path in "$@"; do
 
     #Append METADATA no diretório recycle bin.
     echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE" # Name, size, permissions, owner
-    echo -e "${GREEN}File '$file_path' moved to recycle bin as '$new_name'${NC}"
+    echo -e "${GREEN}'$file_path' moved to recycle bin as '$new_name'${NC}"
   done
    
     
@@ -125,7 +130,8 @@ return 0
 # Returns: 0 on success
 #################################################
   list_recycled() {
-    # Usar variável de ambiente para sorting, default é "date"
+    # Usar variável de ambiente para sorting, default é "date"        #
+
     local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
 
     echo "=== Recycle Bin Contents ==="
@@ -166,7 +172,7 @@ return 0
         id=$(echo "$id" | tr -d ' ')
         name=$(echo "$name" | tr -d ' ')
         path=$(echo "$path" | tr -d ' ')
-        deletion_date=$(echo "$deletion_date" | tr -d ' ')
+        deletion_date=$(echo "$deletion_date")
         size=$(echo "$size" | tr -d ' ')
 
         if ! [[ "$size" =~ ^[0-9]+$ ]]; then
@@ -442,6 +448,7 @@ empty_recyclebin() {
   # TODO: Implement this function
   local deletionFile="$1" 
   local index=1
+  
   matches=()
 
   if [[ -z "$deletionFile" ]];then #Checks for arguments. If it doesn't have any args it will ask to delete everything.
@@ -458,6 +465,7 @@ empty_recyclebin() {
   echo "Operation canceled. Exiting... "
   exit 1
   fi
+
   else
 
   while IFS=',' read -r id name path date size type perms owner; do
@@ -508,14 +516,101 @@ empty_recyclebin() {
 # Returns: 0 on success
 #################################################
 search_recycled() {
+  shopt -s nocasematch
   # TODO: Implement this function
   local pattern="$1"
+  matches=()
+  local found=0
 
+  if [[ -z "$pattern" ]];then #Checks for arguments. If it doesn't have any args it will ask to delete everything.
+  echo "No pattern or name. "
+  return 1
+  fi
+
+  if [[ "$pattern" == \*.* ]]; then
+    local extension="${pattern#*.}"  
+      while IFS=',' read -r id name path date size type perms owner; do
+      local regex="\.${extension}$"
+      if [[ "$name" =~ $regex ]]; then  
+        echo "ID: $id | Name: $name | Deleted on: $date | Original Path: ${path} | Type: $type"     
+        found=1
+        fi    
+    done < <(tail -n +3 "$METADATA_FILE" )
+  else
+      while IFS=',' read -r id name path date size type perms owner; do
+      if [[ "$name" =~ $pattern || "$path" =~ $pattern ]]; then  
+        echo "ID: $id | Name: $name | Deleted on: $date | Original Path: ${path} | Type: $type"     
+        found=1
+        fi    
+    done < <(tail -n +3 "$METADATA_FILE" )
+  fi
+
+    if [[ "$found" -eq 0 ]]; then
+      echo "No matching files found."
+      return 1
+    fi
+  
   # Your code here
   # Hint: Use grep to search metadata
 
   return 0
 }
+#################################################
+# Function: auto_cleanup
+# Description: Erases files before a determined date.
+# Parameters: None
+# Returns: 0
+#################################################
+
+auto_cleanup(){
+  if [ ! -f "$CONFIG_FILE" ]; then
+    echo "No config file found. Skipping auto-cleanup."
+    return 1
+  fi
+
+  local cleanup_days
+  cleanup_days=$(grep "^AUTO_CLEANUP_DAYS=" "$CONFIG_FILE"| cut -d '=' -f2) 
+  
+  if ! [[ "$cleanup_days" =~ ^[0-9]+$ ]]; then
+    echo "Invalid AUTO_CLEANUP_DAYS value. "
+    return 1
+  
+  fi
+  
+    local present_date
+    present_date=$(date +%s)
+    local deleted_ids=()
+
+    while IFS=',' read -r id name path date size type perms owner; do
+      if ! deletion_date=$(date -d "$date" +%s 2>/dev/null); then
+        echo "Skipping entry with invalid date: $date"
+        continue
+      fi
+        
+      age_days=$(( (present_date - deletion_date) / 86400 ))
+      if [[ $age_days -ge $cleanup_days ]]; then
+        file_path="$FILES_DIR/${name}_${id}"
+        if [ -e "$file_path" ]; then
+          echo "The file : "$name" with the ID: "${id}", has been deleted. " 
+          deleted_ids+=("$id")
+          if [ -d "$file_path" ]; then
+            rmdir "$file_path" 2>/dev/null || rm -rf "$file_path"
+          else
+            rm -f "$file_path"
+          fi
+        fi    
+      fi
+    done < <(tail -n +3 "$METADATA_FILE" )
+
+    if [ "${#deleted_ids[@]}" -gt 0 ]; then
+    grep -v -E "^(${deleted_ids[*]// /|})," "$METADATA_FILE" > "$METADATA_FILE.tmp" && mv "$METADATA_FILE.tmp" "$METADATA_FILE"
+    fi
+
+    
+
+    return 0
+}
+
 
 #################################################
 # Function: display_help
@@ -531,11 +626,13 @@ SYNOPSIS:
     $0 [OPTION] [ARGUMENTS]
 
 OPTIONS:
-    delete <file>    Move file/directory to recycle bin
+    delete <file>  | delete <file> <file> ...  Move file(s)/directory to recycle bin
     list             List all items in recycle bin
-    restore <id>     Restore file by ID
+    restore <name or ID >     Restore file by name or ID. 
     search <pattern> Search for files by name
     empty            Empty recycle bin permanently
+    empty <name>     Shows a list of matching files (if there is any) and asks for a second
+                     index input to choose which to delete. 
     help             Display this help message
 
 EXAMPLES:
@@ -544,6 +641,9 @@ EXAMPLES:
     $0 restore 1696234567_abc123
     $0 search "*.pdf"
     $0 empty
+    
+    $0 empty "test.txt"
+    
 
 EOF
   return 0
@@ -580,6 +680,9 @@ main() {
     help|--help|-h)
       display_help
       ;;
+    auto|auto_cleanup|auto_clean)
+      auto_cleanup
+      ;;  
     *)
       echo "Invalid option. Use 'help' for usage information."
       exit 1
