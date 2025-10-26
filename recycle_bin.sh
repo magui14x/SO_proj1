@@ -31,6 +31,7 @@ initialize_recyclebin() {
     echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" >> "$METADATA_FILE"
     echo "Recycle bin initialized at $RECYCLE_BIN_DIR"
     echo "AUTO_CLEANUP_DAYS=30" > "$CONFIG_FILE"
+    echo "MAX_SIZE_MB=1024" >> "$CONFIG_FILE"
     return 0
   fi
   return 0
@@ -118,8 +119,9 @@ delete_file() {
 # Returns: 0 on success
 #################################################
   list_recycled() {
-    # Usar variável de ambiente para sorting, default é "date"        #
-
+    # Usar variável de ambiente para sorting, default é "date"        
+    local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
+    max_size_bytes=$((max_size_mb * 1024 * 1024))
     local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
 
     echo "=== Recycle Bin Contents ==="
@@ -137,8 +139,8 @@ delete_file() {
     fi
 
     # Print header
-    printf "%-18s %-20s %-50s %-20s %-10s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
-    printf "%-18s %-20s %-50s %-20s %-10s\n" "--" "----" "------------" "-------------" "----"
+    printf "%-20s %-20s %-40s %-25s %-13s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
+    printf "%-20s %-20s %-40s %-25s %-13s\n" "--" "----" "------------" "-------------" "----"
 
     # Calcular total_size ANTES do loop
     local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
@@ -177,11 +179,16 @@ delete_file() {
             size_human="$(echo "scale=1; $size/1048576" | bc) MB"
         fi
 
-        local display_id="${id:0:15}.."
+        local display_id="${id:0:25}.."
         local display_name="${name:0:18}.."
-        
 
-        printf "%-18s %-20s %-50s %-20s %-10s\n" "$display_id" "$display_name" "$path" "$deletion_date" "$size_human"
+        if [ ${#path} -gt 38 ]; then
+        display_path="${path:10:38}.."
+        else
+        display_path="$path"
+        fi
+
+        printf "%-20s %-20s %-40s %-25s %-13s\n\n" "$id" "$display_name" "$display_path" "$deletion_date" "$size_human"
     done
     
     echo ""
@@ -196,9 +203,15 @@ delete_file() {
     else
         total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
     fi
+
+    usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
+
     
     echo "Total size: $total_size_human"
     echo "Sorted by: $sort_by"
+    echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
+    if [[ $usage_percent -gt 100 ]]; then
+      echo "Usage above the limit, consider using auto_cleanup to erase old files"
     echo ""
     echo "To change sorting, use:"
     echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
@@ -237,30 +250,13 @@ restore_file() {
     fi
 
     # MOSTRAR TODAS AS ENTRADAS DISPONÍVEIS
-    echo "=== ALL AVAILABLE FILES IN RECYCLE BIN ==="
+    echo "=== ALL MATCHING FILES IN RECYCLE BIN ==="
     echo "Metadata file: $METADATA_FILE"
-    echo ""
-    
-    # Header
-    printf "%-20s %-25s %-30s\n" "ID" "FILENAME" "ORIGINAL PATH"
-    printf "%-20s %-25s %-30s\n" "---" "--------" "-------------"
-    
-    # Listar todas as entradas
-    tail -n +2 "$METADATA_FILE" | while IFS=',' read -r id name path rest; do
-        # Limpar campos
-        id=$(echo "$id" | tr -d '[:space:]')
-        name=$(echo "$name" | tr -d '[:space:]')
-        path=$(echo "$path" | tr -d '[:space:]')
-        
-        printf "%-20s %-25s %-30s\n" "$id" "$name" "$path"
-    done
-    
-    echo ""
-    echo "=== SEARCH RESULTS ==="
-    
+    echo ""    
     # Procurar de forma mais flexível
     local metadata_entry
-    metadata_entry=$(grep -i "$search_term" "$METADATA_FILE" | grep -v "^#")
+    metadata_entry=$(awk -F ',' -v term="$search_term" '
+    tolower($1) == tolower(term) || tolower($2) == tolower(term)' "$METADATA_FILE")
     
     if [ -z "$metadata_entry" ]; then
         echo -e "${RED}Error: No file found matching '$search_term'${NC}"
@@ -282,7 +278,7 @@ restore_file() {
         metadata_entry=$(echo "$metadata_entry" | head -n 1)
     fi
     
-    echo "Using entry: $metadata_entry"
+    echo -e "Using entry: ${GREEN}$metadata_entry${NC}"
     echo ""
 
     # Parse metadata fields
@@ -598,6 +594,53 @@ auto_cleanup(){
 
     return 0
 }
+#################################################
+# Function: Show Statistics
+# Description: Shows recycle_bin information
+# Parameters: None
+# Returns: 0
+#################################################
+
+show_statistics() {
+  local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
+  max_size_bytes=$((max_size_mb * 1024 * 1024))
+  
+  if [ ! -f "$METADATA_FILE" ] || [ "$(wc -l < "$METADATA_FILE")" -le 1 ]; then
+    echo "Recycle bin is empty."
+    return 0
+  fi
+
+  echo "📊 Recycle Bin Statistics"
+  echo "-------------------------"
+
+  # Total items
+  total_items=$(tail -n +3 "$METADATA_FILE" | wc -l)
+  echo "Total items: $total_items"
+
+  # Total size in bytes
+  total_size=$(tail -n +3 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum}')
+  human_size=$(numfmt --to=iec --suffix=B "$total_size")
+  usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
+  echo "Total size: $human_size"
+  echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
+
+  # Breakdown by type
+  file_count=$(tail -n +3 "$METADATA_FILE" | awk -F',' '$6 ~ /file/ {count++} END {print count+0}')
+  dir_count=$(tail -n +3 "$METADATA_FILE" | awk -F',' '$6 ~ /directory/ {count++} END {print count+0}')
+  echo "Files: $file_count"
+  echo "Directories: $dir_count"
+
+  # Oldest and newest deletion dates
+  oldest=$(tail -n +3 "$METADATA_FILE" | awk -F',' '{print $4}' | sort | head -n 1)
+  newest=$(tail -n +3 "$METADATA_FILE" | awk -F',' '{print $4}' | sort | tail -n 1)
+  echo "Oldest deletion: $oldest"
+  echo "Most recent deletion: $newest"
+
+  # Average file size
+  avg_size=$(tail -n +3 "$METADATA_FILE" | awk -F',' '{sum += $5} END {if (NR > 0) print int(sum / NR); else print 0}')
+  human_avg=$(numfmt --to=iec --suffix=B "$avg_size")
+  echo "Average file size: $human_avg"
+}
 
 
 #################################################
@@ -623,7 +666,9 @@ OPTIONS:
                      index input to choose which to delete. 
     help             Display this help message
     auto             Remove files inside the trash bin older than the chosen amount of days. Beware the default is 30 days!!!
+    
 EXAMPLES:
+
     $0 delete myfile.txt
     $0 list
     $0 restore 1696234567_abc123
@@ -668,9 +713,12 @@ main() {
     help|--help|-h)
       display_help
       ;;
-    auto|auto_cleanup|auto_clean)
+    auto|auto_cleanup|auto_clean|cleanup)
       auto_cleanup
       ;;  
+      stats|statistics|show_stats|show_statistics)
+      show_statistics
+      ;;
     *)
       echo "Invalid option. Use 'help' for usage information."
       exit 1
