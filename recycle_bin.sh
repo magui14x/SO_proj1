@@ -55,73 +55,61 @@ generate_unique_id() {
 # Returns: 0 on success, 1 on failure
 #################################################
 delete_file() {
-  # TODO: Implement this function
-local file_path="$1"
+  local file_path="$1"
 
-# Validate input
-if [ -z "$file_path" ]; then
-echo -e "${RED}Error: No file specified${NC}"
-return 1
-fi
+  # Validate input
+  if [ -z "$file_path" ]; then
+    echo -e "${RED}Error: No file specified${NC}"
+    return 1
+  fi
 
+  if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
+    echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"
+    return 1
+  fi
 
-if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
-  echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"
-  return 1
-fi
+  if [ ! -e "$file_path" ]; then
+    echo -e "${RED}Error: '$file_path' does not exist${NC}"
+    return 1
+  fi
 
-if [[ -d "$file_path" ]]; then
-  find "$file_path" -mindepth 1 | while read -r sub_item; do
-  delete_file "$sub_item"
-  done
-fi
+  # If it's a directory, delete contents first
+  if [[ -d "$file_path" ]]; then
+    find "$file_path" -mindepth 1 | while read -r sub_item; do
+      [[ -e "$sub_item" ]] && delete_file "$sub_item"
+    done
+  fi
 
-for file_path in "$@"; do
-# Check if file exists
-    if [ ! -e "$file_path" ]; then
-        echo -e "${RED}Error: '$file_path' does not exist${NC}"
-        return 1
-    fi
-    
-    local base_name
-    base_name=$(basename "$file_path")
-    local ID
-    ID=$(generate_unique_id)
-    local new_name="${base_name}_${ID}"
-    local deletion_date
-    deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
-    local original_permissions
-    original_permissions=$(stat -c "%a" "$FILES_DIR/$new_name")
+  # Collect metadata BEFORE moving
+  local base_name
+  base_name=$(basename "$file_path")
+  local ID
+  ID=$(generate_unique_id)
+  local new_name="${base_name}_${ID}"
+  local deletion_date
+  deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
+  local original_path
+  original_path=$(realpath "$file_path")
+  local file_size
+  file_size=$(stat -c "%s" "$file_path")
+  local file_type
+  file_type=$(file -b "$file_path")
+  local permissions
+  permissions=$(stat -c "%a" "$file_path")
+  local owner
+  owner=$(stat -c "%U:%G" "$file_path")
 
+  # Move to recycle bin
+  mv "$file_path" "$FILES_DIR/$new_name"
 
-    mv "$file_path" "$FILES_DIR/$new_name"
+  # Append metadata
+  echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
+  echo -e "${GREEN}'$file_path' moved to recycle bin as '$new_name'${NC}"
 
-        # Obter metadados using stat and file commands
-        local original_path
-        original_path=$(realpath "$file_path")
-        local file_size
-        file_size=$(stat -c "%s" "$FILES_DIR/$new_name")
-        local file_type
-        file_type=$(file -b "$FILES_DIR/$new_name")
-        local permissions
-        permissions=$(stat -c "%a" "$FILES_DIR/$new_name")
-        local owner
-        owner=$(stat -c "%U:%G" "$FILES_DIR/$new_name")
-
-    #Append METADATA no diretório recycle bin.
-    echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE" # Name, size, permissions, owner
-    echo -e "${GREEN}'$file_path' moved to recycle bin as '$new_name'${NC}"
-  done
-   
-    
-# Your code here
-# Hint: Get file metadata using stat command
-# Hint: Generate unique ID
-# Hint: Move file to FILES_DIR with unique ID
-# Hint: Add entry to metadata file
-echo "Delete function called with: $file_path"
-return 0
+  echo "Delete function called with: $file_path"
+  return 0
 }
+
 
 #################################################
 # Function: list_recycled
@@ -634,7 +622,7 @@ OPTIONS:
     empty <name>     Shows a list of matching files (if there is any) and asks for a second
                      index input to choose which to delete. 
     help             Display this help message
-
+    auto             Remove files inside the trash bin older than the chosen amount of days. Beware the default is 30 days!!!
 EXAMPLES:
     $0 delete myfile.txt
     $0 list
