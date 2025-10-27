@@ -17,7 +17,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-#################################################
+#################################################F
 # Function: initialize_recyclebin
 # Description: Creates recycle bin directory structure
 # Parameters: None
@@ -84,13 +84,15 @@ delete_file() {
   # Collect metadata BEFORE moving
   local base_name
   base_name=$(basename "$file_path")
+  base_name="${base_name//[ ,]/}" 
   local ID
   ID=$(generate_unique_id)
-  local new_name="${base_name}_${ID}"
+  local new_name="${base_name}_${ID}"   
   local deletion_date
   deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
   local original_path
   original_path=$(realpath "$file_path")
+  original_path="${original_path//[ ,]/}" 
   local file_size
   file_size=$(stat -c "%s" "$file_path")
   local file_type
@@ -105,7 +107,7 @@ delete_file() {
 
   # Append metadata
   echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
-  echo -e "${GREEN}'$file_path' moved to recycle bin as '$new_name'${NC}"
+  echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
 
   echo "Delete function called with: $file_path"
   return 0
@@ -181,7 +183,6 @@ delete_file() {
 
         local display_id="${id:0:25}.."
         local display_name="${name:0:18}.."
-
         if [ ${#path} -gt 38 ]; then
         display_path="${path:10:38}.."
         else
@@ -210,8 +211,9 @@ delete_file() {
     echo "Total size: $total_size_human"
     echo "Sorted by: $sort_by"
     echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
-    if [[ $usage_percent -gt 100 ]]; then
+    if [[ $usage_percent > 100 ]]; then
       echo "Usage above the limit, consider using auto_cleanup to erase old files"
+      fi
     echo ""
     echo "To change sorting, use:"
     echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
@@ -308,7 +310,7 @@ restore_file() {
         echo -e "${RED}Error: Physical file not found in recycle bin${NC}"
         echo "Looking for pattern: '*_${id}'"
         echo "Files in recycle bin:"
-        ls -la "$FILES_DIR/" 2>/dev/null || echo "Files directory not found"
+        list_recycled
         return 1
     fi
 
