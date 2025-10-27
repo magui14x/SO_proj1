@@ -21,11 +21,11 @@
 ries
 - **Expected:** ~/.recycle_bin/ created with subdirectories
 - **Actual:** All directories created successfully
-Página 27 de 34
 - **Screenshot:** screenshots/init.png
+
 #### Test 1.2: Delete Single File
 - **Status:** ✓ PASS
-- **Description:** Delete a single file
+- **Description:** Delete a single file, moving it to recycle_bin
 - **Steps:**
 1. Created test.txt with content
 2. Ran: `./recycle_bin.sh delete test.txt`
@@ -33,7 +33,53 @@ Página 27 de 34
 - **Expected:** File moved, metadata created
 - **Actual:** Success message displayed, file in recycle bin
 - **Screenshot:** screenshots/delete_single.png
-[Continue for all tests...]
+
+#### Test 1.3: Delete Multiple File
+- **Status:** ✓ PASS
+- **Description:** Delete multiple files, moving them to recycle_bin
+- **Steps:**
+1. Created test.txt and test2.txt with content
+2. Ran: `./recycle_bin.sh delete test.txt test1.txt`
+3. Verify files moved to recycle bin
+- **Expected:** File moved, metadata created
+- **Actual:** Success message displayed, file in recycle bin
+- **Screenshot:** screenshots/delete_mult.png
+
+#### Test 1.4: Delete Empty Directory
+- **Status:** ✓ PASS
+- **Description:** Delete an empty directory
+- **Steps:**
+1. Created test directory without any files inside
+2. Ran: `./recycle_bin.sh delete test`
+3. Verify directory moved to recycle bin
+- **Expected:** Directory moved, metadata created
+- **Actual:** Success message displayed, file in recycle bin
+- **Screenshot:** screenshots/delete_directory.png
+
+#### Test 1.5: Delete Directory with contents (recursive)
+- **Status:** ✓ PASS
+- **Description:** Delete a directory with contents
+- **Steps:**
+1. Created test directory with files inside: testdir/test1.txt and testdir/test2.txt
+2. Ran: `./recycle_bin.sh delete test`
+3. Verify files moved to recycle bin first and then directory moved aswell.
+- **Expected:** Directory moved, files moved, metadata created
+- **Actual:** Success message displayed, file in recycle bin
+- **Screenshot:** screenshots/delete_rec_directory.png
+
+#### Test 1.6: Empty entire recycle bin.
+- **Status:** ✓ PASS
+- **Description:** Deletes with rm -f every file in the recycle_bin.
+- **Steps:**
+1. With for example the files that created and deleted before in previous tests, we run step 2.
+2. Ran: `./recycle_bin.sh empty`
+3. Verify files moved to recycle bin are no longer there, and the metadata was erased..
+- **Expected:** Empty recycle_bin, metadata removed
+- **Actual:** Empty recycle_bin, metadata removed,Success message displayed
+- **Screenshot:** screenshots/empty_bin.png
+
+
+
 ---
 ## Known Issues
 ### Issue 1: Symbolic Link Handling
