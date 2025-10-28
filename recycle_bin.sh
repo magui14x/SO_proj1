@@ -70,7 +70,7 @@ delete_file() {
   fi
 
   if [ ! -e "$file_path" ]; then
-    echo -e "${RED}Error: '$file_path' does not exist${NC}"
+    echo -e "${RED}Error non-existant: '$file_path' does not exist${NC}"
     return 1
   fi
 
@@ -84,7 +84,7 @@ delete_file() {
   # Collect metadata BEFORE moving
   local base_name
   base_name=$(basename "$file_path")
-  base_name="${base_name//[ ,]/}" 
+  base_name="${base_name//[,]/}" 
   local ID
   ID=$(generate_unique_id)
   local new_name="${base_name}_${ID}"   
@@ -92,7 +92,7 @@ delete_file() {
   deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
   local original_path
   original_path=$(realpath "$file_path")
-  original_path="${original_path//[ ,]/}" 
+  original_path="${original_path//[,]/}" 
   local file_size
   file_size=$(stat -c "%s" "$file_path")
   local file_type
@@ -162,7 +162,7 @@ delete_file() {
       fi
         # remove os espacos tr -d
         id=$(echo "$id" | tr -d ' ')
-        name=$(echo "$name" | tr -d ' ')
+        name=$(echo "$name" )
         path=$(echo "$path" | tr -d ' ')
         deletion_date=$(echo "$deletion_date")
         size=$(echo "$size" | tr -d ' ')
@@ -289,8 +289,8 @@ restore_file() {
     
     # Clean up fields
     file_type=$(echo "$file_type" | sed 's/^"//;s/"$//')
-    original_name=$(echo "$original_name" | tr -d '[:space:]')
-    original_path=$(echo "$original_path" | tr -d '[:space:]')
+    original_name=$(echo "$original_name" )
+    original_path=$(echo "$original_path" )
     id=$(echo "$id" | tr -d '[:space:]')
 
     echo "File details:"
@@ -627,8 +627,8 @@ show_statistics() {
   echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
 
   # Breakdown by type
-  file_count=$(tail -n +3 "$METADATA_FILE" | awk -F',' '$6 ~ /file/ {count++} END {print count+0}')
   dir_count=$(tail -n +3 "$METADATA_FILE" | awk -F',' '$6 ~ /directory/ {count++} END {print count+0}')
+  file_count=$(( $total_items - $dir_count ))
   echo "Files: $file_count"
   echo "Directories: $dir_count"
 
@@ -638,8 +638,13 @@ show_statistics() {
   echo "Oldest deletion: $oldest"
   echo "Most recent deletion: $newest"
 
-  # Average file size
-  avg_size=$(tail -n +3 "$METADATA_FILE" | awk -F',' '{sum += $5} END {if (NR > 0) print int(sum / NR); else print 0}')
+  
+  if ! [[ "$file_count" =~ ^[0-9]+$ ]] || [ "$file_count" -le 0 ]; then
+    avg_size=0
+  else
+    # total_size is already computed above as the sum of sizes for all entries
+    avg_size=$(( total_size / file_count ))
+  fi
   human_avg=$(numfmt --to=iec --suffix=B "$avg_size")
   echo "Average file size: $human_avg"
 }
