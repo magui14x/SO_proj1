@@ -54,6 +54,12 @@ generate_unique_id() {
   echo "${timestamp}_${random}"
 }
 
+check_disk_space(){
+  local total_size
+  total_size=$(tail -n +3 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum}')
+  echo "$total_size"
+}
+
 #################################################
 # Function: delete_file
 # Description: Moves file/directory to recycle bin
@@ -61,7 +67,10 @@ generate_unique_id() {
 # Returns: 0 on success, 1 on failure
 #################################################
   delete_file() {
+    local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
+    max_size_bytes=$((max_size_mb * 1024 * 1024))
     
+
     if [ "$#" -eq 0 ]; then
       echo -e "${RED}Error: No file specified${NC}"
       return 1
@@ -112,6 +121,17 @@ generate_unique_id() {
     permissions=$(stat -c "%a" "$file_path")
     local owner
     owner=$(stat -c "%U:%G" "$file_path")
+
+    local current_usage
+    current_usage=$(check_disk_space)
+    local new_total
+    new_total=$(( file_size + current_usage ))
+
+    if [ "$new_total" -gt "$max_size_bytes" ]; then
+      echo -e "${YELLOW}This File is too large for the current max size in recycle bin (${max_size_mb} MB).${NC}"
+      echo "It is advised too either change the limit or to not do this deletion. "
+      continue
+      fi
 
     # Move to recycle bin
     mv "$file_path" "$FILES_DIR/$new_name"

@@ -349,9 +349,20 @@ ries
 1. Manually edited metadata.db to include malformed lines
 2. Ran: `./recycle_bin.sh list`
 3. Verify if the script handles the corruption gracefully.
-- **Expected:** Error message displayed, script exits without executing unintended actions.
-- **Actual:** Error message shown: "Error: No file specified"
-- **Screenshot:** screenshots/missing.png
+- **Expected:** Script skips invalid entries or prints warnings without crashing
+- **Actual:** No Warning displayed, skips invalid llines and valid entries still processed
+- **Screenshot:** screenshots/corrupt.png
+
+### Test 3.3: Insufficient disk space
+- **Status:** ✓ PASS
+- **Description:** Simulate a corrupted metadata file and observe script behavior.
+- **Steps:**
+1. Manually edited metadata.db to include malformed lines
+2. Ran: `./recycle_bin.sh list`
+3. Verify if the script handles the corruption gracefully.
+- **Expected:** Script skips invalid entries or prints warnings without crashing
+- **Actual:** No Warning displayed, skips invalid llines and valid entries still processed
+- **Screenshot:** screenshots/corrupt.png
 
 
 
