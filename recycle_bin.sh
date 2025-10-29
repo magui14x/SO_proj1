@@ -61,7 +61,7 @@ generate_unique_id() {
 # Returns: 0 on success, 1 on failure
 #################################################
   delete_file() {
-    local file_path="$1"
+    for file_path in "$@"; do
 
     # Validate input
     if [ -z "$file_path" ]; then
@@ -118,6 +118,7 @@ generate_unique_id() {
     echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
 
     echo "Delete function called with: $file_path"
+    done
     return 0
   }
 
@@ -317,6 +318,8 @@ restore_file() {
     echo ""
 
     
+
+    
      # Find the actual file in recycle bin (allow regular files and symbolic links)
     local recycled_file
     recycled_file=$(find "$FILES_DIR" -name "*_${id}" \( -type f -o -type l \) 2>/dev/null | head -n 1)
@@ -350,6 +353,22 @@ restore_file() {
             return 1
         fi
     fi
+
+    if [ ! -w "$original_dir" ]; then
+    echo -e "${YELLOW}Warning: No write permission for '$original_dir'${NC}"
+    read -p "Attempt to grant write permission? [y/N]: " fix_perm
+    if [[ "$fix_perm" =~ ^[Yy]$ ]]; then
+        if chmod u+w "$original_dir" 2>/dev/null; then
+            echo -e "${GREEN}Write permission granted to '$original_dir'${NC}"
+        else
+            echo -e "${RED}Error: Failed to change permissions. You may need root access.${NC}"
+            return 1
+        fi
+    else
+        echo "Restoration cancelled due to insufficient permissions"
+        return 1
+    fi
+fi
 
     # Handle file existence conflicts
     local final_destination="$original_path"

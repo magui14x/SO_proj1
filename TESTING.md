@@ -283,6 +283,64 @@ ries
 - **Actual:** Prints message of success, and moves the file maintaining name and content. 
 - **Screenshot:** screenshots/hidden.png
 
+#### Test 2.11: Delete files from different directories.
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles a hidden file.
+- **Steps:**
+1. Create a directory dir1 with the file test1.txt, and directory dir2 with the file test2.txt
+2. Ran: `./recycle_bin.sh delete dir1/test1.txt dir2/test2.txt`
+3. Verifiy the recycle_bin and the metadata to check the name of the files.
+- **Expected:** Handles the information correctly, deletes both files while maintaining the original name and content.
+- **Actual:** Prints message of success, and moves the file maintaining name and content. 
+- **Screenshot:** screenshots/different.png
+
+#### Test 2.11: Delete files from different directories.
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles a hidden file.
+- **Steps:**
+1. Create a directory dir1 with the file test1.txt, and directory dir2 with the file test2.txt
+2. Ran: `./recycle_bin.sh delete dir1/test1.txt dir2/test2.txt`
+3. Verifiy the recycle_bin and the metadata to check the name of the files.
+- **Expected:** Handles the information correctly, deletes both files while maintaining the original name and content.
+- **Actual:** Prints message of success, and moves the file maintaining name and content. 
+- **Screenshot:** screenshots/different.png
+
+#### Test 2.11: Restore files to read-only directories
+- **Status:** ✓ PASS
+- **Description:** Tests to see if it can restore files to a dir with read only permission.
+- **Steps:**
+1. Create a directory dir1 and a test.txt inside.
+2. Ran: `./recycle_bin.sh delete dir1/test.txt`
+3. Ran: `chmod -w dir1`
+4. Ran `./recycle_bin.sh restore test.txt`.
+5. Accept the permission change for the directory.
+6. Verify the directory dir1 to check for the file.
+
+- **Expected:** Handles the information correctly, changes permissions, restores the file to the original directory and restores the original permissions.
+- **Actual:** Handles the information correctly, changes permissions, restores the file to the original directory but doesn't restore the original permissions.
+- **Screenshot:** screenshots/read_only.png
+
+### 3. Error Handling
+### Test 3.1: Invalid command line arguments
+- **Status:** ✓ PASS
+- **Description:** Ensure the script handles unsupported or unknown commands gracefully.
+- **Steps:**
+1. Ran: `./recycle_bin.sh unknown_command`
+2. Verified that the script printed an error message and exited safely.
+- **Expected:** Error message displayed, script exits without executing unintended actions.
+- **Actual:** Error message shown: "Error: Unknown command 'unknown_command'"
+- **Screenshot:** screenshots/unknown_command.png
+
+### Test 3.2: Missing required parameters
+- **Status:** ✓ PASS
+- **Description:** Attempt to run commands without required arguments.
+- **Steps:**
+1. Ran: `./recycle_bin.sh unknown_command`
+2. Verified that the script printed an error message and exited safely.
+- **Expected:** Error message displayed, script exits without executing unintended actions.
+- **Actual:** Error message shown: "Error: Unknown command 'unknown_command'"
+- **Screenshot:** screenshots/unknown_command.png
+
 
 
 ---
