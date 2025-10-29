@@ -32,6 +32,10 @@ initialize_recyclebin() {
     echo "Recycle bin initialized at $RECYCLE_BIN_DIR"
     echo "AUTO_CLEANUP_DAYS=30" > "$CONFIG_FILE"
     echo "MAX_SIZE_MB=1024" >> "$CONFIG_FILE"
+    [{ ! -f "$CONFIG_FILE" }] && {
+      echo "MAX_SIZE=104857600" > "$CONFIG_FILE" # 100MB default
+      echo "AUTO_EMPTY_DAYS=30" >> "$CONFIG_FILE" # 30 days default
+    }
     return 0
   fi
   return 0

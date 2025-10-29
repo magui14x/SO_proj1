@@ -1,41 +1,44 @@
-#11 complete project proposal
-
-
 #!/bin/bash
+
 # Test Suite for Recycle Bin System
 SCRIPT="./recycle_bin.sh"
 TEST_DIR="test_data"
 PASS=0
 FAIL=0
+
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
+
 # Test Helper Functions
 setup() {
     mkdir -p "$TEST_DIR"
     rm -rf ~/.recycle_bin
 }
+
 teardown() {
     rm -rf "$TEST_DIR"
     rm -rf ~/.recycle_bin
-    }
+}
+
 assert_success() {
     if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ PASS${NC}: $1"
-    ((PASS++))
+        echo -e "${GREEN}✓ PASS${NC}: $1"
+        ((PASS++))
     else
-    echo -e "${RED}✗ FAIL${NC}: $1"
-    ((FAIL++))
+        echo -e "${RED}✗ FAIL${NC}: $1"
+        ((FAIL++))
     fi
-    }
+}
+
 assert_fail() {
     if [ $? -ne 0 ]; then
-    echo -e "${GREEN}✓ PASS${NC}: $1"
-    ((PASS++))
+        echo -e "${GREEN}✓ PASS${NC}: $1"
+        ((PASS++))
     else
-    echo -e "${RED}✗ FAIL${NC}: $1"
-    ((FAIL++))
+        echo -e "${RED}✗ FAIL${NC}: $1"
+        ((FAIL++))
     fi
 }
 
@@ -48,6 +51,7 @@ test_initialization() {
     [ -d ~/.recycle_bin ] && echo "✓ Directory created"
     [ -f ~/.recycle_bin/metadata.db ] && echo "✓ Metadata file created"
 }
+
 test_delete_file() {
     echo "=== Test: Delete File ==="
     setup
@@ -57,12 +61,14 @@ test_delete_file() {
     [ ! -f "$TEST_DIR/test.txt" ] && echo "✓ File removed from original
     location"
 }
+
 test_list_empty() {
     echo "=== Test: List Empty Bin ==="
     setup
     $SCRIPT list | grep -q "empty"
     assert_success "List empty recycle bin"
 }
+
 test_restore_file() {
     echo "=== Test: Restore File ==="
     setup
@@ -74,6 +80,8 @@ test_restore_file() {
     assert_success "Restore file"
     [ -f "$TEST_DIR/restore_test.txt" ] && echo "✓ File restored"
 }
+
+
 # Run all tests
 echo "========================================="
 echo " Recycle Bin Test Suite"
@@ -82,8 +90,12 @@ test_initialization
 test_delete_file
 test_list_empty
 test_restore_file
+
+
 # Add more test functions here
+
 teardown
+
 echo "========================================="
 echo "Results: $PASS passed, $FAIL failed"
 echo "========================================="
