@@ -61,13 +61,16 @@ generate_unique_id() {
 # Returns: 0 on success, 1 on failure
 #################################################
   delete_file() {
-    for file_path in "$@"; do
-
-    # Validate input
-    if [ -z "$file_path" ]; then
+    
+    if [ "$#" -eq 0 ]; then
       echo -e "${RED}Error: No file specified${NC}"
       return 1
     fi
+    
+    for file_path in "$@"; do
+
+    # Validate input
+    
 
     if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
       echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"

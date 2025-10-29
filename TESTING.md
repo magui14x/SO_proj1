@@ -323,7 +323,7 @@ ries
 ### 3. Error Handling
 ### Test 3.1: Invalid command line arguments
 - **Status:** ✓ PASS
-- **Description:** Ensure the script handles unsupported or unknown commands gracefully.
+- **Description:** Simulate a corrupted metadata file and observe script behavior.
 - **Steps:**
 1. Ran: `./recycle_bin.sh unknown_command`
 2. Verified that the script printed an error message and exited safely.
@@ -335,11 +335,24 @@ ries
 - **Status:** ✓ PASS
 - **Description:** Attempt to run commands without required arguments.
 - **Steps:**
-1. Ran: `./recycle_bin.sh unknown_command`
-2. Verified that the script printed an error message and exited safely.
+1. Ran: `./recycle_bin.sh delete`
+2. Ran: `./recycle_bin.sh restore`
+3. Verified that both commands printed appropriate error messages.
 - **Expected:** Error message displayed, script exits without executing unintended actions.
-- **Actual:** Error message shown: "Error: Unknown command 'unknown_command'"
-- **Screenshot:** screenshots/unknown_command.png
+- **Actual:** Error message shown: "Error: No file specified"
+- **Screenshot:** screenshots/missing.png
+
+### Test 3.3: Corrupted metadata file
+- **Status:** ✓ PASS
+- **Description:** Simulate a corrupted metadata file and observe script behavior.
+- **Steps:**
+1. Manually edited metadata.db to include malformed lines
+2. Ran: `./recycle_bin.sh list`
+3. Verify if the script handles the corruption gracefully.
+- **Expected:** Error message displayed, script exits without executing unintended actions.
+- **Actual:** Error message shown: "Error: No file specified"
+- **Screenshot:** screenshots/missing.png
+
 
 
 
