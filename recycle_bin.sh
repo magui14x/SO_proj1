@@ -10,6 +10,7 @@ RECYCLE_BIN_DIR="$HOME/recycle_bin"
 FILES_DIR="$RECYCLE_BIN_DIR/files"
 METADATA_FILE="$RECYCLE_BIN_DIR/metadata.db"
 CONFIG_FILE="$RECYCLE_BIN_DIR/config"
+LOG_FILE="$RECYCLE_BIN_DIR/recyclebin.log"
 
 # Color codes for output (optional)
 RED='\033[0;31m'
@@ -31,12 +32,12 @@ initialize_recyclebin() {
     echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" >> "$METADATA_FILE"
     echo "Recycle bin initialized at $RECYCLE_BIN_DIR"
     echo "AUTO_CLEANUP_DAYS=30" > "$CONFIG_FILE"
-    echo "MAX_SIZE_MB=1024" >> "$CONFIG_FILE"
-    [{ ! -f "$CONFIG_FILE" }] && {
-      echo "MAX_SIZE=104857600" > "$CONFIG_FILE" # 100MB default
-      echo "AUTO_EMPTY_DAYS=30" >> "$CONFIG_FILE" # 30 days default
-    }
-    return 0
+    echo "MAX_SIZE_MB=1024" >> "$CONFIG_FILE" 
+
+    if [ ! -f "$LOG_FILE" ]; then
+        touch "$LOG_FILE"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - SYSTEM: Recycle bin initialized" >> "$LOG_FILE"
+    fi
   fi
   return 0
 }
