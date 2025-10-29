@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Global Configuration
+RECYCLE_BIN_DIR="$HOME/.recycle_bin"
+FILES_DIR="$RECYCLE_BIN_DIR/files"
+METADATA_FILE="$RECYCLE_BIN_DIR/metadata.db"
+CONFIG_FILE="$RECYCLE_BIN_DIR/config"
+LOG_FILE="$RECYCLE_BIN_DIR/recyclebin.log"
+
 # Test Suite for Recycle Bin System
 SCRIPT="./recycle_bin.sh"
 TEST_DIR="test_data"
@@ -43,18 +50,17 @@ assert_fail() {
 }
 
 
-
-
-
-
 # Test Cases
 test_initialization() {
     echo "=== Test: Initialization ==="
     setup
     $SCRIPT help > /dev/null
     assert_success "Initialize recycle bin"
-    [ -d ~/recycle_bin ] && echo "✓ Directory created"
-    [ -f ~/recycle_bin/metadata.db ] && echo "✓ Metadata file created"
+    [ -d "$RECYCLE_BIN_DIR" ] && echo "✓ Directory created"
+    [ -d "$FILES_DIR" ]&& echo "✓ Files Directory created"
+    [ -f "$METADATA_FILE" ] && echo "✓ Metadata file created"
+    [ -f "$CONFIG_FILE" ] && echo "✓ Configurations file created"
+    [ -f "$LOG_FILE" ] && echo "✓ Log file created"
 }
 
 test_delete_file() {

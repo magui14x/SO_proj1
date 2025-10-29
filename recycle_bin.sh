@@ -6,7 +6,7 @@
 #################################################
 
 # Global Configuration
-RECYCLE_BIN_DIR="$HOME/recycle_bin"
+RECYCLE_BIN_DIR="$HOME/.recycle_bin"
 FILES_DIR="$RECYCLE_BIN_DIR/files"
 METADATA_FILE="$RECYCLE_BIN_DIR/metadata.db"
 CONFIG_FILE="$RECYCLE_BIN_DIR/config"
@@ -66,84 +66,94 @@ check_disk_space(){
 # Parameters: $1 - path to file/directory
 # Returns: 0 on success, 1 on failure
 #################################################
-  delete_file() {
-    local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
-    max_size_bytes=$((max_size_mb * 1024 * 1024))
-    
+delete_file() {
+  local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
+  max_size_bytes=$((max_size_mb * 1024 * 1024))
+  
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETE operation started for files: $@" >> "$LOG_FILE"
 
-    if [ "$#" -eq 0 ]; then
-      echo -e "${RED}Error: No file specified${NC}"
-      return 1
-    fi
-    
-    for file_path in "$@"; do
-
-    # Validate input
-    
-
+  if [ "$#" -eq 0 ]; then
+    echo -e "${RED}Error: No file specified${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $error_msg" >> "$LOG_FILE"
+    return 1
+  fi
+  
+  for file_path in "$@"; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Processing file: '$current_file'" >> "$LOG_FILE"
+    #se for importante n apaga
     if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
       echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Attempted to delete protected file: '$current_file'" >> "$LOG_FILE"
       return 1
     fi
 
+    #ficheiro existe
     if [ ! -e "$file_path" ]; then
       echo -e "${RED}Error non-existant: '$file_path' does not exist${NC}"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $not_exist_msg" >> "$LOG_FILE"
       return 1
     fi
 
     # If it's a directory (but not a symlink pointing to a directory), delete contents first
     # This prevents following and deleting the contents of directories through symbolic links
     if [[ -d "$file_path" && ! -L "$file_path" ]]; then
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - Recursively deleting directory contents: '$current_file'" >> "$LOG_FILE"
       find "$file_path" -mindepth 1 | while read -r sub_item; do
         [[ -e "$sub_item" ]] && delete_file "$sub_item"
       done
     fi
-    
-    
-    
-    # Collect metadata BEFORE moving
-    local base_name
-    base_name=$(basename "$file_path")
-    base_name="${base_name//[,]/}" 
-    local ID
-    ID=$(generate_unique_id)
-    local new_name="${base_name}_${ID}"   
-    local deletion_date
-    deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
-    local original_path
-    original_path=$(realpath "$file_path")
-    original_path="${original_path//[,]/}" 
-    local file_size
-    file_size=$(stat -c "%s" "$file_path")
-    local file_type
-    file_type=$(file -b "$file_path")
-    local permissions
-    permissions=$(stat -c "%a" "$file_path")
-    local owner
-    owner=$(stat -c "%U:%G" "$file_path")
+  
+  
+  
+  # Collect metadata BEFORE moving
+  local base_name
+  base_name=$(basename "$file_path")
+  base_name="${base_name//[,]/}" 
+  local ID
+  ID=$(generate_unique_id)
+  local new_name="${base_name}_${ID}"   
+  local deletion_date
+  deletion_date=$(date +"%Y-%m-%d %H:%M:%S")
+  local original_path
+  original_path=$(realpath "$file_path")
+  original_path="${original_path//[,]/}" 
+  local file_size
+  file_size=$(stat -c "%s" "$file_path")
+  local file_type
+  file_type=$(file -b "$file_path")
+  local permissions
+  permissions=$(stat -c "%a" "$file_path")
+  local owner
+  owner=$(stat -c "%U:%G" "$file_path")
 
-    local current_usage
-    current_usage=$(check_disk_space)
-    local new_total
-    new_total=$(( file_size + current_usage ))
+  local current_usage
+  current_usage=$(check_disk_space)
+  local new_total
+  new_total=$(( file_size + current_usage ))
 
-    if [ "$new_total" -gt "$max_size_bytes" ]; then
-      echo -e "${YELLOW}This File is too large for the current max size in recycle bin (${max_size_mb} MB).${NC}"
-      echo "It is advised too either change the limit or to not do this deletion. "
-      continue
-      fi
+  if [ "$new_total" -gt "$max_size_bytes" ]; then
+    echo -e "${YELLOW}This File is too large for the current max size in recycle bin (${max_size_mb} MB).${NC}"
+    echo "It is advised too either change the limit or to not do this deletion. "
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - SIZE ERROR: $size_error_msg" >> "$LOG_FILE"
+    continue
+    fi
 
-    # Move to recycle bin
-    mv "$file_path" "$FILES_DIR/$new_name"
+  # Move to recycle bin
+  mv "$file_path" "$FILES_DIR/$new_name"
 
-    # Append metadata
-    echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
-    echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
+# Append metadata
+echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
+echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
 
-    echo "Delete function called with: $file_path"
-    done
-    return 0
-  }
+echo "$(date '+%Y-%m-%d %H:%M:%S') - METADATA: Added entry for ID '$ID' ('$base_name')" >> "$LOG_FILE"
+
+echo "Delete function called with: $file_path"
+done
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETE operation completed successfully for all files" >> "$LOG_FILE"
+
+return 0
+}
 
 
 #################################################
@@ -152,114 +162,114 @@ check_disk_space(){
 # Parameters: None
 # Returns: 0 on success
 #################################################
-  list_recycled() {
-    # Usar variável de ambiente para sorting, default é "date"        
-    local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
-    max_size_bytes=$((max_size_mb * 1024 * 1024))
-    local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
-    local display_path
-    local display_name
+list_recycled() {
+  # Usar variável de ambiente para sorting, default é "date"        
+  local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
+  max_size_bytes=$((max_size_mb * 1024 * 1024))
+  local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
+  local display_path
+  local display_name
 
-    echo "=== Recycle Bin Contents ==="
+  echo "=== Recycle Bin Contents ==="
 
-    if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
-        echo "Recycle bin is empty"
-        return 0
+  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
+      echo "Recycle bin is empty"
+      return 0
+  fi
+
+  local total_items=$(($(wc -l < "$METADATA_FILE") - 2))  #total de linhas - 1 (do header)
+
+  if [ "$total_items" -eq 0 ]; then
+      echo "Recycle bin is empty"
+      return 0
+  fi
+
+  # Print header
+  printf "%-20s %-20s %-50s %-25s %-13s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
+  printf "%-20s %-20s %-50s %-25s %-13s\n" "--" "----" "------------" "-------------" "----"
+
+  # Calcular total_size ANTES do loop
+  local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
+  
+  
+  # ORDENAÇÃO baseada na variável de ambiente
+  case "$sort_by" in
+      "name")
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
+      "size")
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
+      "date"|*)
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
+  esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
+    if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
+      continue
     fi
+      # remove os espacos tr -d
+      id=$(echo "$id" | tr -d ' ')
+      name=$(echo "$name" )
+      path=$(echo "$path" | tr -d ' ')
+      deletion_date=$(echo "$deletion_date")
+      size=$(echo "$size" | tr -d ' ')
 
-    local total_items=$(($(wc -l < "$METADATA_FILE") - 2))  #total de linhas - 1 (do header)
-
-    if [ "$total_items" -eq 0 ]; then
-        echo "Recycle bin is empty"
-        return 0
-    fi
-
-    # Print header
-    printf "%-20s %-20s %-50s %-25s %-13s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
-    printf "%-20s %-20s %-50s %-25s %-13s\n" "--" "----" "------------" "-------------" "----"
-
-    # Calcular total_size ANTES do loop
-    local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
-    
-    
-    # ORDENAÇÃO baseada na variável de ambiente
-    case "$sort_by" in
-        "name")
-            tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
-        "size")
-            tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
-        "date"|*)
-            tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
-    esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
-      if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
-        continue
+      if ! [[ "$size" =~ ^[0-9]+$ ]]; then
+        continue  
       fi
-        # remove os espacos tr -d
-        id=$(echo "$id" | tr -d ' ')
-        name=$(echo "$name" )
-        path=$(echo "$path" | tr -d ' ')
-        deletion_date=$(echo "$deletion_date")
-        size=$(echo "$size" | tr -d ' ')
 
-        if ! [[ "$size" =~ ^[0-9]+$ ]]; then
-          continue  
-        fi
-
-        # converte o tamanho para humano
-        local size_human=""
-        if [ "$size" -lt 1024 ]; then
-            size_human="${size}B"
-        elif [ "$size" -lt 1048576 ]; then
-            size_human="$(echo "scale=1; $size/1024" | bc) KB"
-        else
-            size_human="$(echo "scale=1; $size/1048576" | bc) MB"
-        fi
-
-        if [ ${#name} -gt 18 ];then
-          display_name="${name:0:18}.."
-          else
-          display_name="$name"
-        fi
-        
-        if [ ${#path} -gt 48 ]; then
-        display_path="${path:10:48}.."
-        else
-        display_path="$path"
-        fi
-
-        printf "%-20s %-20s %-50s %-25s %-13s\n\n" "$id" "$display_name" "$display_path" "$deletion_date" "$size_human"
-    done
-    
-    echo ""
-    echo "Total items: $total_items"
-    
-    # formatar o total_size também para humano
-    local total_size_human=""
-    if [ "$total_size" -lt 1024 ]; then
-        total_size_human="${total_size}B"
-    elif [ "$total_size" -lt 1048576 ]; then
-        total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
-    else
-        total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
-    fi
-
-    usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
-
-    
-    echo "Total size: $total_size_human"
-    echo "Sorted by: $sort_by"
-    echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
-    if [[ $usage_percent > 100 ]]; then
-      echo "Usage above the limit, consider using auto_cleanup to erase old files"
+      # converte o tamanho para humano
+      local size_human=""
+      if [ "$size" -lt 1024 ]; then
+          size_human="${size}B"
+      elif [ "$size" -lt 1048576 ]; then
+          size_human="$(echo "scale=1; $size/1024" | bc) KB"
+      else
+          size_human="$(echo "scale=1; $size/1048576" | bc) MB"
       fi
-    echo ""
-    echo "To change sorting, use:"
-    echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
-    echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
-    echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
-    
-    return 0
-  }
+
+      if [ ${#name} -gt 18 ];then
+        display_name="${name:0:18}.."
+        else
+        display_name="$name"
+      fi
+      
+      if [ ${#path} -gt 48 ]; then
+      display_path="${path:10:48}.."
+      else
+      display_path="$path"
+      fi
+
+      printf "%-20s %-20s %-50s %-25s %-13s\n\n" "$id" "$display_name" "$display_path" "$deletion_date" "$size_human"
+  done
+  
+  echo ""
+  echo "Total items: $total_items"
+  
+  # formatar o total_size também para humano
+  local total_size_human=""
+  if [ "$total_size" -lt 1024 ]; then
+      total_size_human="${total_size}B"
+  elif [ "$total_size" -lt 1048576 ]; then
+      total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
+  else
+      total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
+  fi
+
+  usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
+
+  
+  echo "Total size: $total_size_human"
+  echo "Sorted by: $sort_by"
+  echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
+  if [[ $usage_percent > 100 ]]; then
+    echo "Usage above the limit, consider using auto_cleanup to erase old files"
+    fi
+  echo ""
+  echo "To change sorting, use:"
+  echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
+  echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
+  echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
+  
+  return 0
+}
 
 #################################################
 # Function: restore_file
