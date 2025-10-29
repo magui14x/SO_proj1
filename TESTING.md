@@ -203,20 +203,85 @@ ries
 
 #### Test 2.5: Handle filenames with spaces
 - **Status:** ✓ PASS
-- **Description:** Tests to see how it handles the a file with spaces. 
+- **Description:** Tests to see how it handles a filename with spaces. 
 - **Steps:**
 1. Create file "space test.txt"
 2. Ran: `./recycle_bin.sh delete "space test.txt"`
 3. Verifiy the recycle_bin and the metadata to check the name of the file.
 4. Ran: `./recycle_bin.sh restore "space test.txt"`
-5. Verify the original location to check the file still there with the original name.
+5. Verify the original location to check if the file is there with the original name.
 - **Expected:** Handles the information correctly, deletes and restores file while maintaining the original name.
 - **Actual:** Prints message of success,and moves the file maintaining it's spaced name. 
 - **Screenshot:** screenshots/spaced.png
 
+#### Test 2.6: Handle filenames with special characters (!@#$%^&*())
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles the a file with special characters. 
+- **Steps:**
+1. Create file "(!@#$%^&*())"
+2. Ran: `./recycle_bin.sh delete '(!@#$%^&*())'`
+3. Verifiy the recycle_bin and the metadata to check the name of the file.
+4. Ran: `./recycle_bin.sh restore '(!@#$%^&*())'`
+5. Verify the original location to check if the file is there with the original name.
+- **Expected:** Handles the information correctly, deletes and restores file while maintaining the original name.
+- **Actual:** Prints message of success,and moves the file maintaining it's spaced name. Only works if '' is used. Commas are removed for CSV simplification.
+- **Screenshot:** screenshots/special_char.png
+
+#### Test 2.7: Handle very long filenames (255+ characters)
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles a file with a very long file name. 
+- **Steps:**
+1. Create file "Curious minds wander endlessly through the realms of imagination, discovering ideas that sparkle like distant stars, shaping dreams into purpose and turning questions into the keys that open every hidden door to understanding and wonder." (Asked Chat GPT for this one, and for simplicities' sake I will use the expression [File] to replace this file name.)
+2. Ran: `./recycle_bin.sh delete [File]`
+3. Verifiy the recycle_bin and the metadata to check the name of the file.
+4. Ran: `./recycle_bin.sh restore [File]`
+5. Verify the original location to check if the file is there with the original name.
+- **Expected:** Handles the information correctly, deletes and restores file while maintaining the original name.
+- **Actual:** Prints message of success,and moves the file maintaining it's entire name but removes commas. In the case of list it will truncate the name and the path. 
+- **Screenshot:** screenshots/long_name.png
+
+#### Test 2.8: Handle very large files (>100MB)
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles a very large file. 
+- **Steps:**
+1. Create large file. 
+2. Ran `dd if=/dev/zero of=big_test_file.txt bs=1M count=120` 
+3. Ran: `./recycle_bin.sh delete big_test_file.txt`
+4. Verifiy the recycle_bin and the metadata to check the name of the file.
+5. Ran: `./recycle_bin.sh restore big_test_file.txt`
+6. Verify the original location to check if the file is there with the original name.
+- **Expected:** Handles the information correctly, deletes and restores file while maintaining the original name.
+- **Actual:** Prints message of success,and moves the file maintaining it's entire name and content.  
+- **Screenshot:** screenshots/large_file.png
 
 
+#### Test 2.9: Handle symbolic links.
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles a filename with symbolic links.
+- **Steps:**
+1. Create a test.txt.
+2. Ran `ln -s target.txt symbolic.txt`
+3. Ran: `./recycle_bin.sh delete symbolic`
+4. Verifiy the recycle_bin and the metadata to check the name of the file.
+5. Ran: `./recycle_bin.sh restore symbolic.txt`
+6. Verify the original location to check if the file is there with the original name.
+- **Expected:** Handles the information correctly, deletes and restores file while maintaining the original name.
+- **Actual:** Prints message of success,and moves the file but aiming at the link target. While it can be restored with another name it will be a variation of target.txt, and loses the name symbolic.txt 
+- **Screenshot:** screenshots/symbolic.png
 
+
+#### Test 2.10: Handle hidden files (starting with .).
+- **Status:** ✓ PASS
+- **Description:** Tests to see how it handles a hidden file.
+- **Steps:**
+1. Create a .test.txt.
+2. Ran: `./recycle_bin.sh delete .test.txt`
+3. Verifiy the recycle_bin and the metadata to check the name of the file.
+4. Ran: `./recycle_bin.sh restore .test.txt`
+5. Verify the original location to check if the file is there with the original name.
+- **Expected:** Handles the information correctly, deletes and restores file while maintaining the original name and content.
+- **Actual:** Prints message of success, and moves the file maintaining name and content. 
+- **Screenshot:** screenshots/hidden.png
 
 
 
