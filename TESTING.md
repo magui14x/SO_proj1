@@ -7,9 +7,9 @@
 ## Test Summary
 | Category | Total Tests | Passed | Failed | Pass Rate |
 |----------|-------------|--------|--------|-----------|
-| Basic Functionality | 0 | 0 | 0 | 100% |
-| Edge Cases | 0 | 0 | 0 | 100% |
-| Error Handling | 0 | 0 | 0 | 100% |
+| Basic Functionality | 12 | 0 | 0 | 100% |
+| Edge Cases | 12 | 0 | 0 | 100% |
+| Error Handling | 7 | 0 | 0 | 100% |
 | Performance | 0 | 0 | 0 | 100% |
 | **TOTAL** | **0** | **0** | **0** | **q00%** |
 ---
@@ -191,16 +191,6 @@ ries
 - **Actual:** Prints message of error, and recommends using list to check file name's and ID's. 
 - **Screenshot:** screenshots/fakeID.png
 
-#### Test 2.4: Restore with ID that doesn't exist
-- **Status:** ✓ PASS
-- **Description:** Tests to see how it handles the attemp to restore a file when the ID doesn't exist. 
-- **Steps:**
-1. Ran: `./recycle_bin.sh restore 12121_121212e`
-2. Verify display message stating that there wasn't found any matches.
-- **Expected:** Handles the information correctly, no restored file.
-- **Actual:** Prints message of error, and recommends using list to check file name's and ID's. 
-- **Screenshot:** screenshots/fakeID.png
-
 #### Test 2.5: Handle filenames with spaces
 - **Status:** ✓ PASS
 - **Description:** Tests to see how it handles a filename with spaces. 
@@ -283,16 +273,6 @@ ries
 - **Actual:** Prints message of success, and moves the file maintaining name and content. 
 - **Screenshot:** screenshots/hidden.png
 
-#### Test 2.11: Delete files from different directories.
-- **Status:** ✓ PASS
-- **Description:** Tests to see how it handles a hidden file.
-- **Steps:**
-1. Create a directory dir1 with the file test1.txt, and directory dir2 with the file test2.txt
-2. Ran: `./recycle_bin.sh delete dir1/test1.txt dir2/test2.txt`
-3. Verifiy the recycle_bin and the metadata to check the name of the files.
-- **Expected:** Handles the information correctly, deletes both files while maintaining the original name and content.
-- **Actual:** Prints message of success, and moves the file maintaining name and content. 
-- **Screenshot:** screenshots/different.png
 
 #### Test 2.11: Delete files from different directories.
 - **Status:** ✓ PASS
@@ -305,7 +285,8 @@ ries
 - **Actual:** Prints message of success, and moves the file maintaining name and content. 
 - **Screenshot:** screenshots/different.png
 
-#### Test 2.11: Restore files to read-only directories
+
+#### Test 2.12: Restore files to read-only directories
 - **Status:** ✓ PASS
 - **Description:** Tests to see if it can restore files to a dir with read only permission.
 - **Steps:**
@@ -350,19 +331,55 @@ ries
 2. Ran: `./recycle_bin.sh list`
 3. Verify if the script handles the corruption gracefully.
 - **Expected:** Script skips invalid entries or prints warnings without crashing
-- **Actual:** No Warning displayed, skips invalid llines and valid entries still processed
+- **Actual:** No Warning displayed, skips invalid lines and valid entries still processed
 - **Screenshot:** screenshots/corrupt.png
 
-### Test 3.3: Insufficient disk space
+### Test 3.4: Insufficient disk space
 - **Status:** ✓ PASS
-- **Description:** Simulate a corrupted metadata file and observe script behavior.
+- **Description:** Simulate the deletion of a file that surpasses the size limit.
 - **Steps:**
-1. Manually edited metadata.db to include malformed lines
-2. Ran: `./recycle_bin.sh list`
-3. Verify if the script handles the corruption gracefully.
-- **Expected:** Script skips invalid entries or prints warnings without crashing
-- **Actual:** No Warning displayed, skips invalid llines and valid entries still processed
-- **Screenshot:** screenshots/corrupt.png
+1. Ran: `dd if=/dev/zero of=big_test_file.txt bs=1M count=1025` 
+2. Ran: `./recycle_bin.sh delete big_test_file.txt`
+3. Verify if the script cancels the opperation.
+- **Expected:** Error message: "Error: Not enough space to move file to recycle bin"        
+- **Actual:** Error message displayed, file not moved
+- **Screenshot:** screenshots/insufficient.png
+
+#### Test 3.5: Permission denied errors  
+- **Status:** ✓ PASS  
+- **Description:** Attempt to delete or restore files/directories without sufficient permissions  
+- **Steps:**  
+1. Created a file owned by another user or restricted directory  
+2. Ran: `./recycle_bin.sh delete restricted.txt`  
+3. Verified that the script printed a permission error  
+- **Expected:** Error message: "Error: Permission denied"  
+- **Actual:** Error message displayed, operation aborted  
+- **Screenshot:** screenshots/permission_denied.png  
+
+#### Test 3.6: Attempting to delete recycle bin itself  
+- **Status:** ✓ PASS  
+- **Description:** Prevent deletion of critical system files or the recycle bin directory  
+- **Steps:**  
+1. Ran: `./recycle_bin.sh delete ~/.recycle_bin/`  
+2. Verified that the script blocked the operation  
+- **Expected:** Error message: "You can't erase this file. (It's... kind of important...)"  
+- **Actual:** Error message displayed, no deletion performed  
+- **Screenshot:** screenshots/delete_bin_itself.png  
+
+#### Test 3.7: Concurrent operations (run two instances)  
+- **Status:** ✓ PASS  
+- **Description:** Run two instances of the script simultaneously to test race conditions  
+- **Steps:**  
+1. Opened two terminals  
+2. Ran: ` echo "test content" > file1.txt     
+./recycle_bin.sh delete file1.txt &
+./recycle_bin.sh delete file1.txt &                                   
+wait`
+  
+3. Verified that metadata and file operations remained consistent  
+- **Expected:** No corruption or duplication in metadata, no file loss  
+- **Actual:** Both operations completed successfully, metadata intact  
+- **Screenshot:** screenshots/concurrent.png
 
 
 

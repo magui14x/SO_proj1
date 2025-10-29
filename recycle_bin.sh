@@ -74,30 +74,25 @@ delete_file() {
 
   if [ "$#" -eq 0 ]; then
     echo -e "${RED}Error: No file specified${NC}"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $error_msg" >> "$LOG_FILE"
-    return 1
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: No file specified" >> "$LOG_FILE"
+    continue
   fi
   
   for file_path in "$@"; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Processing file: '$current_file'" >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Processing file: '$file_path'" >> "$LOG_FILE"
     #se for importante n apaga
     if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
       echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Attempted to delete protected file: '$current_file'" >> "$LOG_FILE"
-      return 1
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Attempted to delete protected file: '$file_path'" >> "$LOG_FILE"
+      continue
     fi
 
-    #ficheiro existe
-    if [ ! -e "$file_path" ]; then
-      echo -e "${RED}Error non-existant: '$file_path' does not exist${NC}"
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $not_exist_msg" >> "$LOG_FILE"
-      return 1
-    fi
+    
 
     # If it's a directory (but not a symlink pointing to a directory), delete contents first
     # This prevents following and deleting the contents of directories through symbolic links
     if [[ -d "$file_path" && ! -L "$file_path" ]]; then
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - Recursively deleting directory contents: '$current_file'" >> "$LOG_FILE"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - Recursively deleting directory contents: '$file_path'" >> "$LOG_FILE"
       find "$file_path" -mindepth 1 | while read -r sub_item; do
         [[ -e "$sub_item" ]] && delete_file "$sub_item"
       done
@@ -134,9 +129,15 @@ delete_file() {
   if [ "$new_total" -gt "$max_size_bytes" ]; then
     echo -e "${YELLOW}This File is too large for the current max size in recycle bin (${max_size_mb} MB).${NC}"
     echo "It is advised too either change the limit or to not do this deletion. "
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - SIZE ERROR: $size_error_msg" >> "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - SIZE ERROR: File too large:'$file_path' " >> "$LOG_FILE"
     continue
-    fi
+  fi
+    #ficheiro existe
+  if [ ! -e "$file_path" ]; then
+      echo -e "${RED}Error non-existant: '$file_path' does not exist${NC}"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: File vanished before move. '$file_path' " >> "$LOG_FILE"
+      continue
+  fi
 
   # Move to recycle bin
   mv "$file_path" "$FILES_DIR/$new_name"
