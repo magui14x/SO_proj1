@@ -68,15 +68,14 @@ check_disk_space(){
 #################################################
 delete_file() {
   local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
-  local max_size_bytes=$((max_size_mb * 1024 * 1024))
+  max_size_bytes=$((max_size_mb * 1024 * 1024))
   
   echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETE operation started for files: $@" >> "$LOG_FILE"
 
-  #input?
   if [ "$#" -eq 0 ]; then
     echo -e "${RED}Error: No file specified${NC}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: No file specified" >> "$LOG_FILE"
-    return 1
+    continue
   fi
   
   for file_path in "$@"; do
@@ -88,6 +87,8 @@ delete_file() {
       continue
     fi
 
+    
+
     # If it's a directory (but not a symlink pointing to a directory), delete contents first
     # This prevents following and deleting the contents of directories through symbolic links
     if [[ -d "$file_path" && ! -L "$file_path" ]]; then
@@ -96,6 +97,7 @@ delete_file() {
         [[ -e "$sub_item" ]] && delete_file "$sub_item"
       done
     fi
+  
   
   
   # Collect metadata BEFORE moving
@@ -140,19 +142,19 @@ delete_file() {
   # Move to recycle bin
   mv "$file_path" "$FILES_DIR/$new_name"
 
-  # Append metadata
-  echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
-  echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
+# Append metadata
+echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
+echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
 
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - METADATA: Added entry for ID '$ID' ('$base_name')" >> "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - METADATA: Added entry for ID '$ID' ('$base_name')" >> "$LOG_FILE"
 
-  echo "Delete function called with: $file_path"
-  done
+echo "Delete function called with: $file_path"
+done
 
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETE operation completed successfully for all files" >> "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETE operation completed successfully for all files" >> "$LOG_FILE"
 
-  return 0
-  }
+return 0
+}
 
 
 #################################################
@@ -161,236 +163,115 @@ delete_file() {
 # Parameters: None
 # Returns: 0 on success
 #################################################
-#################################################
-# Function: list_recycled
-# Description: Lists all items in recycle bin
-# Parameters: --detailed for detailed view
-# Returns: 0 on success
-#################################################
-#################################################
-# Function: list_recycled
-# Description: Lists all items in recycle bin
-# Parameters: --detailed for detailed view
-# Returns: 0 on success
-#################################################
 list_recycled() {
-    local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
-    max_size_bytes=$((max_size_mb * 1024 * 1024))
-    local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
-    local display_path
-    local display_name
-    local detailed_mode=false
+  # Usar variável de ambiente para sorting, default é "date"        
+  local max_size_mb=$(grep "^MAX_SIZE_MB=" "$CONFIG_FILE" | cut -d '=' -f2)
+  max_size_bytes=$((max_size_mb * 1024 * 1024))
+  local sort_by="${RECYCLE_BIN_SORT_BY:-date}"
+  local display_path
+  local display_name
 
-    # Check for --detailed flag
-    if [[ "$1" == "--detailed" || "$1" == "-d" ]]; then
-        detailed_mode=true
+  echo "=== Recycle Bin Contents ==="
+
+  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
+      echo "Recycle bin is empty"
+      return 0
+  fi
+
+  local total_items=$(($(wc -l < "$METADATA_FILE") - 2))  #total de linhas - 1 (do header)
+
+  if [ "$total_items" -eq 0 ]; then
+      echo "Recycle bin is empty"
+      return 0
+  fi
+
+  # Print header
+  printf "%-20s %-20s %-50s %-25s %-13s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
+  printf "%-20s %-20s %-50s %-25s %-13s\n" "--" "----" "------------" "-------------" "----"
+
+  # Calcular total_size ANTES do loop
+  local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
+  
+  
+  # ORDENAÇÃO baseada na variável de ambiente
+  case "$sort_by" in
+      "name")
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k2 ;;
+      "size")
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n ;;
+      "date"|*)
+          tail -n +2 "$METADATA_FILE" | sort -t',' -k4 ;;
+  esac | while IFS=',' read -r id name path deletion_date size type permissions owner; do
+    if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
+      continue
     fi
+      # remove os espacos tr -d
+      id=$(echo "$id" | tr -d ' ')
+      name=$(echo "$name" )
+      path=$(echo "$path" | tr -d ' ')
+      deletion_date=$(echo "$deletion_date")
+      size=$(echo "$size" | tr -d ' ')
 
-    echo "=== Recycle Bin Contents ==="
+      if ! [[ "$size" =~ ^[0-9]+$ ]]; then
+        continue  
+      fi
 
-    if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
-        echo "Recycle bin is empty"
-        return 0
+      # converte o tamanho para humano
+      local size_human=""
+      if [ "$size" -lt 1024 ]; then
+          size_human="${size}B"
+      elif [ "$size" -lt 1048576 ]; then
+          size_human="$(echo "scale=1; $size/1024" | bc) KB"
+      else
+          size_human="$(echo "scale=1; $size/1048576" | bc) MB"
+      fi
+
+      if [ ${#name} -gt 18 ];then
+        display_name="${name:0:18}.."
+        else
+        display_name="$name"
+      fi
+      
+      if [ ${#path} -gt 48 ]; then
+      display_path="${path:10:48}.."
+      else
+      display_path="$path"
+      fi
+
+      printf "%-20s %-20s %-50s %-25s %-13s\n\n" "$id" "$display_name" "$display_path" "$deletion_date" "$size_human"
+  done
+  
+  echo ""
+  echo "Total items: $total_items"
+  
+  # formatar o total_size também para humano
+  local total_size_human=""
+  if [ "$total_size" -lt 1024 ]; then
+      total_size_human="${total_size}B"
+  elif [ "$total_size" -lt 1048576 ]; then
+      total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
+  else
+      total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
+  fi
+
+  usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
+
+  
+  echo "Total size: $total_size_human"
+  echo "Sorted by: $sort_by"
+  echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
+  if [[ $usage_percent > 100 ]]; then
+    echo "Usage above the limit, consider using auto_cleanup to erase old files"
     fi
-
-    local total_items=$(($(wc -l < "$METADATA_FILE") - 2))
-
-    if [ "$total_items" -eq 0 ]; then
-        echo "Recycle bin is empty"
-        return 0
-    fi
-
-    # Calcular total_size
-    local total_size=$(tail -n +2 "$METADATA_FILE" | awk -F',' '{sum += $5} END {print sum+0}')
-
-    if [ "$detailed_mode" = true ]; then
-        # DETAILED MODE - Full information per item
-        echo "DETAILED VIEW"
-        echo "============="
-        
-        local count=0
-        # ORDENAÇÃO baseada na variável de ambiente
-        case "$sort_by" in
-            "name")
-                sorted_data=$(tail -n +2 "$METADATA_FILE" | sort -t',' -k2) ;;
-            "size")
-                sorted_data=$(tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n) ;;
-            "date"|*)
-                sorted_data=$(tail -n +2 "$METADATA_FILE" | sort -t',' -k4) ;;
-        esac
-
-        echo "$sorted_data" | while IFS=',' read -r id name path deletion_date size type permissions owner; do
-            if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
-                continue
-            fi
-
-            # Clean fields
-            id=$(echo "$id" | tr -d ' ')
-            name=$(echo "$name")
-            path=$(echo "$path")
-            deletion_date=$(echo "$deletion_date")
-            size=$(echo "$size" | tr -d ' ')
-            type=$(echo "$type" | sed 's/^"//;s/"$//')
-            permissions=$(echo "$permissions" | tr -d ' ')
-            owner=$(echo "$owner" | tr -d ' ')
-
-            if ! [[ "$size" =~ ^[0-9]+$ ]]; then
-                continue
-            fi
-
-            # Convert size to human readable
-            local size_human=""
-            if [ "$size" -lt 1024 ]; then
-                size_human="${size}B"
-            elif [ "$size" -lt 1048576 ]; then
-                size_human="$(echo "scale=1; $size/1024" | bc) KB"
-            else
-                size_human="$(echo "scale=1; $size/1048576" | bc) MB"
-            fi
-
-            ((count++))
-
-            # Linha separadora antes de cada item (exceto o primeiro)
-            if [ $count -gt 1 ]; then
-                echo "------------------------------------------------------------------------"
-            fi
-
-            echo "ITEM $count:"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "ID" "$id"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "Name" "$name"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "Original Path" "$path"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "Deleted" "$deletion_date"
-            printf "  ${GREEN}%-15s${NC}: %s (%s)\n" "Size" "$size_human" "$size bytes"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "Type" "$type"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "Permissions" "$permissions"
-            printf "  ${GREEN}%-15s${NC}: %s\n" "Owner" "$owner"
-            
-            # Show actual file in recycle bin
-            local recycled_file
-            recycled_file=$(find "$FILES_DIR" -name "*_${id}" \( -type f -o -type l \) 2>/dev/null | head -n 1)
-            if [ -n "$recycled_file" ]; then
-                printf "  ${GREEN}%-15s${NC}: %s\n" "Recycled as" "$(basename "$recycled_file")"
-                
-                # Additional file info
-                if [ -f "$recycled_file" ]; then
-                    local file_info
-                    file_info=$(file -b "$recycled_file")
-                    printf "  ${GREEN}%-15s${NC}: %s\n" "File Info" "$file_info"
-                    
-                    # For text files, show first line preview
-                    if [[ "$file_info" == *"text"* ]] && [ "$size" -lt 10240 ]; then
-                        local first_line
-                        first_line=$(head -n 1 "$recycled_file" 2>/dev/null | cut -c1-50)
-                        if [ -n "$first_line" ]; then
-                            printf "  ${GREEN}%-15s${NC}: %s\n" "Preview" "$first_line..."
-                        fi
-                    fi
-                fi
-            fi
-            echo ""
-        done
-
-    else
-        # NORMAL MODE - Compact table view
-        echo "COMPACT VIEW"
-        echo "============"
-        
-        # Print header
-        printf "%-20s %-20s %-50s %-25s %-13s\n" "ID" "NAME" "ORIGINAL PATH" "DELETION DATE" "SIZE"
-        printf "%-20s %-20s %-50s %-25s %-13s\n" "--" "----" "------------" "-------------" "----"
-
-        # ORDENAÇÃO baseada na variável de ambiente
-        case "$sort_by" in
-            "name")
-                sorted_data=$(tail -n +2 "$METADATA_FILE" | sort -t',' -k2) ;;
-            "size")
-                sorted_data=$(tail -n +2 "$METADATA_FILE" | sort -t',' -k5 -n) ;;
-            "date"|*)
-                sorted_data=$(tail -n +2 "$METADATA_FILE" | sort -t',' -k4) ;;
-        esac
-
-        echo "$sorted_data" | while IFS=',' read -r id name path deletion_date size type permissions owner; do
-            if [[ "$id" =~ ^# || -z "$id" || "$id" == "ID" ]]; then
-                continue
-            fi
-
-            # Clean fields
-            id=$(echo "$id" | tr -d ' ')
-            name=$(echo "$name")
-            path=$(echo "$path")
-            deletion_date=$(echo "$deletion_date")
-            size=$(echo "$size" | tr -d ' ')
-
-            if ! [[ "$size" =~ ^[0-9]+$ ]]; then
-                continue
-            fi
-
-            # Convert size to human readable
-            local size_human=""
-            if [ "$size" -lt 1024 ]; then
-                size_human="${size}B"
-            elif [ "$size" -lt 1048576 ]; then
-                size_human="$(echo "scale=1; $size/1024" | bc) KB"
-            else
-                size_human="$(echo "scale=1; $size/1048576" | bc) MB"
-            fi
-
-            # Truncate long names and paths for display
-            if [ ${#name} -gt 18 ]; then
-                display_name="${name:0:18}.."
-            else
-                display_name="$name"
-            fi
-            
-            if [ ${#path} -gt 48 ]; then
-                display_path="${path:0:48}.."
-            else
-                display_path="$path"
-            fi
-
-            printf "%-20s %-20s %-50s %-25s %-13s\n" "$id" "$display_name" "$display_path" "$deletion_date" "$size_human"
-        done
-    fi
-
-    # Common footer for both modes
-    echo ""
-    echo "=== Summary ==="
-    echo "Total items: $total_items"
-    
-    # Format total_size for human readable
-    local total_size_human=""
-    if [ "$total_size" -lt 1024 ]; then
-        total_size_human="${total_size}B"
-    elif [ "$total_size" -lt 1048576 ]; then
-        total_size_human="$(echo "scale=1; $total_size/1024" | bc) KB"
-    else
-        total_size_human="$(echo "scale=1; $total_size/1048576" | bc) MB"
-    fi
-
-    usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
-    
-    echo "Total size: $total_size_human"
-    echo "Sorted by: $sort_by"
-    echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
-    
-    if (( $(echo "$usage_percent > 100" | bc -l) )); then
-        echo -e "${YELLOW}Usage above the limit, consider using auto_cleanup to erase old files${NC}"
-    fi
-
-    if [ "$detailed_mode" = false ]; then
-        echo ""
-        echo "View options:"
-        echo "  ./recycle_bin.sh list --detailed    # Detailed view with full information"
-        echo "  ./recycle_bin.sh list               # Compact table view (default)"
-        echo ""
-        echo "Sorting options:"
-        echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
-        echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
-        echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
-    fi
-
-    return 0
+  echo ""
+  echo "To change sorting, use:"
+  echo "  export RECYCLE_BIN_SORT_BY=name    # Sort by name"
+  echo "  export RECYCLE_BIN_SORT_BY=size    # Sort by size" 
+  echo "  export RECYCLE_BIN_SORT_BY=date    # Sort by date (default)"
+  
+  return 0
 }
+
 #################################################
 # Function: restore_file
 # Description: Restores file from recycle bin
@@ -400,41 +281,34 @@ list_recycled() {
 restore_file() {
     local search_term="$1"
     
-    # Log the restoration attempt
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - RESTORE: Attempting to restore '$search_term'" >> "$LOG_FILE"
+    echo "=== DEBUG RESTORE ==="
+    echo "Searching for: '$search_term'"
     
     if [ -z "$search_term" ]; then
         echo -e "${RED}Error: No file ID or filename specified${NC}"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: No search term provided for restore" >> "$LOG_FILE"
         return 1
     fi
 
     # Verificar se o metadata file existe
     if [ ! -f "$METADATA_FILE" ]; then
         echo -e "${RED}Error: Recycle bin is not initialized${NC}"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Recycle bin not initialized" >> "$LOG_FILE"
         return 1
     fi
 
-    if [ ! -s "$METADATA_FILE" ] || [ $(wc -l < "$METADATA_FILE") -le 2 ]; then
+    if [ ! -s "$METADATA_FILE" ]; then
         echo -e "${RED}Error: Recycle bin is empty${NC}"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Recycle bin empty during restore attempt" >> "$LOG_FILE"
         return 1
     fi
 
-    # Procurar de forma mais flexível - CORREÇÃO: ignorar cabeçalho e buscar melhor
+    # MOSTRAR TODAS AS ENTRADAS DISPONÍVEIS
+    echo "=== ALL MATCHING FILES IN RECYCLE BIN ==="
+    echo "Metadata file: $METADATA_FILE"
+    echo ""    
+    # Procurar de forma mais flexível
     local metadata_entry
-    metadata_entry=$(tail -n +3 "$METADATA_FILE" | awk -F ',' -v term="$search_term" '
-    {
-        clean_id = $1;
-        gsub(/^[ \t]+|[ \t]+$/, "", clean_id);
-        clean_name = $2;
-        gsub(/^[ \t]+|[ \t]+$/, "", clean_name);
-        if (tolower(clean_id) == tolower(term) || tolower(clean_name) == tolower(term)) {
-            print $0;
-        }
-    }' | head -n 1)  # Pegar apenas a primeira ocorrência
-
+    metadata_entry=$(awk -F ',' -v term="$search_term" '
+    tolower($1) == tolower(term) || tolower($2) == tolower(term)' "$METADATA_FILE")
+    
     if [ -z "$metadata_entry" ]; then
         echo -e "${RED}Error: No file found matching '$search_term'${NC}"
         echo ""
@@ -442,9 +316,21 @@ restore_file() {
         echo "• Use './recycle_bin.sh list' to see all files"
         echo "• Use the exact ID from the list above"
         echo "• Or use part of the filename"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: No match found for '$search_term'" >> "$LOG_FILE"
         return 1
     fi
+    
+    echo "Found entries:"
+    echo "$metadata_entry"
+    echo ""
+    
+    # Se encontrar múltiplas entradas, usar a primeira
+    if [ $(echo "$metadata_entry" | wc -l) -gt 1 ]; then
+        echo -e "${YELLOW}Multiple files found. Using the first one.${NC}"
+        metadata_entry=$(echo "$metadata_entry" | head -n 1)
+    fi
+    
+    echo -e "Using entry: ${GREEN}$metadata_entry${NC}"
+    echo ""
 
     # Parse metadata fields
     local id original_name original_path deletion_date file_size file_type permissions owner
@@ -452,10 +338,9 @@ restore_file() {
     
     # Clean up fields
     file_type=$(echo "$file_type" | sed 's/^"//;s/"$//')
-    original_name=$(echo "$original_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    original_path=$(echo "$original_path" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    original_name=$(echo "$original_name" )
+    original_path=$(echo "$original_path" )
     id=$(echo "$id" | tr -d '[:space:]')
-    permissions=$(echo "$permissions" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     echo "File details:"
     echo "• ID: $id"
@@ -466,29 +351,23 @@ restore_file() {
     echo "• Permissions: $permissions"
     echo ""
 
-    # Find the actual file in recycle bin (allow regular files, symbolic links AND directories) - CORREÇÃO
+    
+
+    
+     # Find the actual file in recycle bin (allow regular files and symbolic links)
     local recycled_file
-    recycled_file=$(find "$FILES_DIR" -name "*_${id}" \( -type f -o -type l -o -type d \) 2>/dev/null | head -n 1)
+    recycled_file=$(find "$FILES_DIR" -name "*_${id}" \( -type f -o -type l \) 2>/dev/null | head -n 1)
     
     if [ -z "$recycled_file" ]; then
         echo -e "${RED}Error: Physical file not found in recycle bin${NC}"
         echo "Looking for pattern: '*_${id}'"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Physical file missing for ID '$id'" >> "$LOG_FILE"
+        echo "Files in recycle bin:"
+        search_recycled "*_${id}"
         return 1
     fi
 
     echo "Physical file found: $recycled_file"
     echo ""
-
-    # Check disk space at destination - NOVO: verificar espaço em disco
-    local available_space
-    available_space=$(df "$(dirname "$original_path")" 2>/dev/null | awk 'NR==2 {print $4 * 1024}')  # Convert to bytes
-    if [ -n "$available_space" ] && [ "$available_space" -lt "$file_size" ]; then
-        echo -e "${RED}Error: Insufficient disk space at destination${NC}"
-        echo "Available: $(numfmt --to=iec $available_space), Required: $(numfmt --to=iec $file_size)"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Insufficient disk space for restoring '$id'" >> "$LOG_FILE"
-        return 1
-    fi
 
     # Check if original directory exists
     local original_dir
@@ -500,42 +379,33 @@ restore_file() {
         if [[ "$create_dir" =~ ^[Yy]$ ]]; then
             if ! mkdir -p "$original_dir" 2>/dev/null; then
                 echo -e "${RED}Error: Failed to create directory '$original_dir'${NC}"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Failed to create directory '$original_dir'" >> "$LOG_FILE"
                 return 1
             fi
             echo -e "${GREEN}Directory created successfully${NC}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Created directory: '$original_dir'" >> "$LOG_FILE"
         else
             echo "Restoration cancelled"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - CANCELLED: User cancelled due to missing directory" >> "$LOG_FILE"
             return 1
         fi
     fi
 
-    # CORREÇÃO: Fechamento do bloco if que estava incompleto
     if [ ! -w "$original_dir" ]; then
-        echo -e "${YELLOW}Warning: No write permission for '$original_dir'${NC}"
-        read -p "Attempt to grant write permission? [y/N]: " fix_perm
-        if [[ "$fix_perm" =~ ^[Yy]$ ]]; then
-            if chmod u+w "$original_dir" 2>/dev/null; then
-                echo -e "${GREEN}Write permission granted to '$original_dir'${NC}"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - Granted write permission to: '$original_dir'" >> "$LOG_FILE"
-            else
-                echo -e "${RED}Error: Failed to change permissions. You may need root access.${NC}"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Failed to change permissions for '$original_dir'" >> "$LOG_FILE"
-                return 1
-            fi
+    echo -e "${YELLOW}Warning: No write permission for '$original_dir'${NC}"
+    read -p "Attempt to grant write permission? [y/N]: " fix_perm
+    if [[ "$fix_perm" =~ ^[Yy]$ ]]; then
+        if chmod u+w "$original_dir" 2>/dev/null; then
+            echo -e "${GREEN}Write permission granted to '$original_dir'${NC}"
         else
-            echo "Restoration cancelled due to insufficient permissions"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - CANCELLED: Insufficient permissions for '$original_dir'" >> "$LOG_FILE"
+            echo -e "${RED}Error: Failed to change permissions. You may need root access.${NC}"
             return 1
         fi
+    else
+        echo "Restoration cancelled due to insufficient permissions"
+        return 1
     fi
+fi
 
     # Handle file existence conflicts
     local final_destination="$original_path"
-    local conflict_resolution="direct"
-    
     if [ -e "$original_path" ]; then
         echo -e "${YELLOW}Warning: A file already exists at '$original_path'${NC}"
         echo "Choose an option:"
@@ -548,22 +418,10 @@ restore_file() {
             read -p "Enter your choice [1-3]: " choice
             case "$choice" in
                 1)
-                    if [ -d "$original_path" ] && [ ! -L "$original_path" ]; then
-                        # Para diretórios, precisa remover cuidadosamente
-                        if ! rm -rf "$original_path" 2>/dev/null; then
-                            echo -e "${RED}Error: Cannot overwrite directory. Permission denied or directory not empty.${NC}"
-                            echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Cannot overwrite directory '$original_path'" >> "$LOG_FILE"
-                            return 1
-                        fi
-                    else
-                        # Para arquivos e symlinks
-                        if ! rm -f "$original_path" 2>/dev/null; then
-                            echo -e "${RED}Error: Cannot overwrite file. Permission denied.${NC}"
-                            echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Cannot overwrite file '$original_path'" >> "$LOG_FILE"
-                            return 1
-                        fi
+                    if ! rm -f "$original_path" 2>/dev/null; then
+                        echo -e "${RED}Error: Cannot overwrite file. Permission denied.${NC}"
+                        return 1
                     fi
-                    conflict_resolution="overwrite"
                     echo "Overwriting existing file..."
                     ;;
                 2)
@@ -572,21 +430,18 @@ restore_file() {
                     local base_name
                     base_name=$(basename "$original_path")
                     local extension=""
-                    local name_part="$base_name"
                     
                     # Handle files with extensions
                     if [[ "$base_name" =~ ^(.+)\.([^.]+)$ ]]; then
-                        name_part="${BASH_REMATCH[1]}"
+                        base_name="${BASH_REMATCH[1]}"
                         extension=".${BASH_REMATCH[2]}"
                     fi
                     
-                    final_destination="$(dirname "$original_path")/${name_part}_restored_${timestamp}${extension}"
-                    conflict_resolution="renamed"
+                    final_destination="$(dirname "$original_path")/${base_name}_restored_${timestamp}${extension}"
                     echo "Will restore as: $(basename "$final_destination")"
                     ;;
                 3)
                     echo "Restoration cancelled"
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') - CANCELLED: User cancelled due to file conflict" >> "$LOG_FILE"
                     return 1
                     ;;
                 *)
@@ -603,7 +458,6 @@ restore_file() {
     if ! mv "$recycled_file" "$final_destination" 2>/dev/null; then
         echo -e "${RED}Error: Failed to move file to destination${NC}"
         echo "Check permissions and try again"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Failed to move '$recycled_file' to '$final_destination'" >> "$LOG_FILE"
         return 1
     fi
 
@@ -611,43 +465,33 @@ restore_file() {
     if [ -n "$permissions" ] && [[ "$permissions" =~ ^[0-7]+$ ]]; then
         if chmod "$permissions" "$final_destination" 2>/dev/null; then
             echo -e "${GREEN}Permissions restored to $permissions${NC}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Restored permissions to '$permissions' for '$final_destination'" >> "$LOG_FILE"
         else
             echo -e "${YELLOW}Warning: Could not restore permissions (may require root)${NC}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - WARNING: Could not restore permissions for '$final_destination'" >> "$LOG_FILE"
         fi
     fi
 
     # Remove entry from metadata
     local temp_file
     temp_file=$(mktemp)
-    # CORREÇÃO: método mais robusto para remover entrada
-    if awk -F ',' -v target_id="$id" '$1 != target_id' "$METADATA_FILE" > "$temp_file" 2>/dev/null; then
-        if mv "$temp_file" "$METADATA_FILE"; then
-            echo -e "${GREEN}Metadata updated${NC}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Removed metadata entry for ID '$id'" >> "$LOG_FILE"
-        else
-            echo -e "${YELLOW}Warning: Could not update metadata file${NC}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - WARNING: Could not update metadata file" >> "$LOG_FILE"
-            rm -f "$temp_file"
-        fi
+    if grep -v "^$id," "$METADATA_FILE" > "$temp_file" 2>/dev/null; then
+        mv "$temp_file" "$METADATA_FILE"
+        echo -e "${GREEN}Metadata updated${NC}"
     else
-        echo -e "${YELLOW}Warning: Could not process metadata file${NC}"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - WARNING: Could not process metadata file" >> "$LOG_FILE"
+        echo -e "${YELLOW}Warning: Could not update metadata file${NC}"
         rm -f "$temp_file"
     fi
 
-    # Log the restoration - CORREÇÃO: usar LOG_FILE principal
+    # Log the restoration
     local log_entry
-    log_entry="$(date '+%Y-%m-%d %H:%M:%S') - RESTORED: $original_name (ID: $id) to $final_destination (resolution: $conflict_resolution)"
-    echo "$log_entry" >> "$LOG_FILE"
+    log_entry="$(date '+%Y-%m-%d %H:%M:%S') - RESTORED: $original_name from $id to $final_destination"
+    echo "$log_entry" >> "$RECYCLE_BIN_DIR/restoration.log"
     
     echo -e "${GREEN}File successfully restored to: $final_destination${NC}"
     echo "Restoration completed and logged"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: Restoration completed for '$id'" >> "$LOG_FILE"
 
     return 0
 }
+
 #################################################
 # Function: empty_recyclebin
 # Description: Permanently deletes all items
@@ -930,7 +774,7 @@ main() {
       delete_file "$@"
       ;;
     list)
-      list_recycled "$2"
+      list_recycled
       ;;
     restore)
       restore_file "$2"
@@ -947,7 +791,7 @@ main() {
     auto|auto_cleanup|auto_clean|cleanup)
       auto_cleanup
       ;;  
-    stats|statistics|show_stats|show_statistics)
+      stats|statistics|show_stats|show_statistics)
       show_statistics
       ;;
     *)

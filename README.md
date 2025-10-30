@@ -1,11 +1,13 @@
 # Linux Recycle Bin System
 ## Author
-[Your Name]
-[Your Student ID]
+Margarida Almeida Cardoso 125799
+Enrique Alejandro Iriza de Ornelas 124762
 ## Description
-[Brief project description]
+Simulação de uma reciclagem segura de ficheiros no Linux usando Bash
 ## Installation
-[How to install/setup]
+Instruções para configurar o ambiente e tornar o script executável:
+- Requisitos: Bash 4.0+, Linux (Ubuntu 24.04 ou similar)
+- Comando: "chmod +x recycle_bin.sh"
 ## Usage
 [How to use with examples]
 ## Features
