@@ -419,7 +419,7 @@ restore_file() {
         gsub(/^[ \t]+|[ \t]+$/, "", clean_id);
         clean_name = $2;
         gsub(/^[ \t]+|[ \t]+$/, "", clean_name);
-        if (tolower(clean_id) == tolower(term) || tolower(clean_name) == tolower(term)) {
+        if (tolower(clean_id) == tolower(term) || index(tolower(clean_name),tolower(term)) > 0 ){
             print $0;
         }
     }' | head -n 1)  # Pegar apenas a primeira ocorrência
