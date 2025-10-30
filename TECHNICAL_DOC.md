@@ -112,6 +112,24 @@
 
 ## Function descriptions
 
+initialize_recyclebin() - Sets up the recycle bin environment by creating necessary directories (files/), the metadata database, configuration file, and log file. Ensures the system is ready for use.
+
+check_disk_space() - Calculates the total size (in bytes) of all files currently stored in the recycle bin by summing the FILE_SIZE column in the metadata. Used to enforce space limits.
+
+delete_file() - Moves one or more files or directories to the recycle bin. Captures metadata (name, path, size, type, permissions, owner), checks for protected files, enforces size limits, and logs the operation.
+
+list_recycled() - Displays the contents of the recycle bin in either compact or detailed format. Supports sorting by name, size, or deletion date via the RECYCLE_BIN_SORT_BY environment variable.
+
+restore_file() - Restores a file from the recycle bin to its original location. Handles name conflicts, missing directories, permission issues, and updates the metadata and log accordingly.
+
+empty_recyclebin() - Permanently deletes all files in the recycle bin or a specific file by ID or name. Supports confirmation prompts and a --force mode for silent deletion.
+
+search_recycled() - Searches the recycle bin metadata for files matching a given pattern (ID or partial name). Displays matching entries with basic metadata for user reference.
+
+auto_cleanup() - Automatically deletes files from the recycle bin that exceed the configured age (AUTO_CLEANUP_DAYS). Updates metadata and logs the cleanup summary including space freed.
+
+show_statistics() - Displays summary statistics about the recycle bin, including total items, total size, usage percentage, file type breakdown, deletion date range, and average file size.
+
 
 ## Design decisions and rationale
 

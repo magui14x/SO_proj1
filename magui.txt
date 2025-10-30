@@ -1,0 +1,9 @@
+initialize_recyclebin()
+check_disk_space
+delete_file
+list_recycled
+restore_file
+empty_recyclebin
+search_recycled
+auto_cleanup()
+show_statistics()
