@@ -78,6 +78,7 @@ delete_file() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: No file specified" >> "$LOG_FILE"
     return 1
   fi
+
   
   for file_path in "$@"; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Processing file: '$file_path'" >> "$LOG_FILE"
@@ -87,6 +88,20 @@ delete_file() {
       echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Attempted to delete protected file: '$file_path'" >> "$LOG_FILE"
       continue
     fi
+
+      #ficheiro existe
+    if [ ! -e "$file_path" ]; then
+      echo -e "${RED}Error non-existant: '$file_path' does not exist${NC}"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: File not found. '$file_path' " >> "$LOG_FILE"
+      continue
+    fi
+
+     # Handle symbolic links
+    if [ -L "$file_path" ]; then
+    link_target=$(readlink "$file_path")
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Detected symbolic link: '$file_path' -> '$link_target'" >> "$LOG_FILE"
+    fi
+
 
     # If it's a directory (but not a symlink pointing to a directory), delete contents first
     # This prevents following and deleting the contents of directories through symbolic links
@@ -130,19 +145,28 @@ delete_file() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - SIZE ERROR: File too large:'$file_path' " >> "$LOG_FILE"
     continue
   fi
-    #ficheiro existe
-  if [ ! -e "$file_path" ]; then
-      echo -e "${RED}Error non-existant: '$file_path' does not exist${NC}"
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: File vanished before move. '$file_path' " >> "$LOG_FILE"
-      continue
-  fi
+
+  exec 200>>"$METADATA_FILE"
+  flock -n 200 || {
+  echo -e "${RED}Another deletion is in progress. Try again shortly.${NC}"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Could not acquire lock on metadata file" >> "$LOG_FILE"
+  continue  
+  }
 
   # Move to recycle bin
-  mv "$file_path" "$FILES_DIR/$new_name"
-
-  # Append metadata
+# Try moving the file
+if mv "$file_path" "$FILES_DIR/$new_name" 2>/dev/null; then
+  # Success
   echo "$ID,$base_name,$original_path,$deletion_date,$file_size,\"$file_type\",$permissions,$owner" >> "$METADATA_FILE"
   echo -e "${GREEN}'$file_path' moved to recycle bin as ${NC}${YELLOW}'$new_name'${NC}"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: '$file_path' moved successfully" >> "$LOG_FILE"
+else
+  # Failure
+  echo -e "${RED}Error: Failed to move '$file_path' (insufficient permissions or locked file)${NC}"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Failed to move '$file_path' to recycle bin" >> "$LOG_FILE"
+  flock -u 200  # release the lock
+  continue
+fi
 
   echo "$(date '+%Y-%m-%d %H:%M:%S') - METADATA: Added entry for ID '$ID' ('$base_name')" >> "$LOG_FILE"
 
@@ -506,7 +530,7 @@ restore_file() {
         echo -e "${YELLOW}Warning: No write permission for '$original_dir'${NC}"
         read -p "Attempt to grant write permission? [y/N]: " fix_perm
         if [[ "$fix_perm" =~ ^[Yy]$ ]]; then
-            if chmod u+w "$original_dir" 2>/dev/null; then
+            if chmod u+wx "$original_dir" 2>/dev/null; then
                 echo -e "${GREEN}Write permission granted to '$original_dir'${NC}"
                 echo "$(date '+%Y-%m-%d %H:%M:%S') - Granted write permission to: '$original_dir'" >> "$LOG_FILE"
             else
@@ -777,7 +801,7 @@ search_recycled() {
         found=1
       fi
     else
-      if [[ "$name" =~ $pattern || "$path" =~ $pattern ]]; then
+      if [[ "$name" =~ "$pattern" || "$path" =~ "$pattern" ]]; then
         printf "%-5s %-20s %-50s %-25s %-15s %-10s\n" "$index" "$name" "$path" "$date" "$type" "$id"
         ((index++))
         found=1

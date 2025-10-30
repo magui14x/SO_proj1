@@ -105,6 +105,7 @@ test_restore_file() {
     # Get file ID from metadata instead of list (mais fiável)
     ID=$(grep "restore_test" ~/recycle_bin/metadata.db | cut -d',' -f1)
     $SCRIPT restore "$ID" > /dev/null 2>&1
+    sleep 0.1
     assert_success "Restore file"
     [ -f "$TEST_DIR/restore_test.txt" ] && echo "✓ File restored"
 }
