@@ -1,13 +1,12 @@
 # Linux Recycle Bin System
 ## Author
-Margarida Almeida Cardoso 125799
-Enrique Alejandro Iriza de Ornelas 124762
+Margarida Almeida Cardoso - 125799
+Enrique Alejandro Iriza de Ornelas - 124762
 ## Description
-Simulação de uma reciclagem segura de ficheiros no Linux usando Bash
+Este projeto consiste na implementação de um Recycle Bin para Linux, inspirado na funcionalidade da Reciclagem do Windows. Desenvolvido em Bash Shell Script, o sistema permite eliminar ficheiros de forma segura, com possibilidade de os restaurar antes da eliminação definitiva. Inclui funcionalidades como registo de metadados, visualização e pesquisa de ficheiros eliminados e limpeza automática. 
 ## Installation
-Instruções para configurar o ambiente e tornar o script executável:
-- Requisitos: Bash 4.0+, Linux (Ubuntu 24.04 ou similar)
-- Comando: "chmod +x recycle_bin.sh"
+Instrução para tornar o script executável:
+- Comando: "chmod u+x recycle_bin.sh"
 ## Usage
 [How to use with examples]
 ## Features
@@ -20,4 +19,9 @@ Instruções para configurar o ambiente e tornar o script executável:
 ## Known Issues
 [Any limitations or bugs]
 ## References
-[Resources used]
+#### External code snippets
+#(>3 lines): Cite the source – IEEE template
+### AI assistance
+#Mention in README which parts were assisted
+### Online resources
+#List in references section – IEEE template

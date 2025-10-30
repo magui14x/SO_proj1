@@ -308,6 +308,280 @@ test_permission_handling() {
     chmod 644 ~/recycle_bin/files/* 2>/dev/null || true
 }
 
+
+
+
+
+
+#TESTES DE PERFORMANCE
+# Performance measurement function
+# Improved performance measurement function
+measure_time() {
+    local start_time end_time duration
+    start_time=$(date +%s.%N)
+    # Run command without suppressing output to terminal but capture for verification
+    if [ "$PERF_DEBUG" = "true" ]; then
+        "$@"
+    else
+        "$@" > /dev/null 2>&1
+    fi
+    end_time=$(date +%s.%N)
+    duration=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
+    echo "$duration"
+}
+
+# Format time output
+format_time() {
+    local time_val="$1"
+    if (( $(echo "$time_val < 0.001" | bc -l 2>/dev/null) )); then
+        printf "%.6f seconds" "$time_val"
+    elif (( $(echo "$time_val < 1" | bc -l 2>/dev/null) )); then
+        printf "%.3f seconds" "$time_val"
+    else
+        printf "%.2f seconds" "$time_val"
+    fi
+}
+
+# =============================================================================
+# PERFORMANCE TESTS
+# =============================================================================
+
+performance_delete_100_files() {
+    echo "=== Performance Test: Delete 100+ Files ==="
+    setup
+    
+    # Create 100+ test files
+    echo "Creating 100+ test files..."
+    for i in {1..105}; do
+        echo "content $i" > "$TEST_DIR/test_file_$i.txt"
+    done
+    
+    # Verify files were created
+    local file_count
+    file_count=$(find "$TEST_DIR" -name "test_file_*.txt" | wc -l)
+    echo "Created $file_count files for testing"
+    
+    # Measure deletion time - use a more precise approach
+    echo "Starting deletion of $file_count files..."
+    
+    # Time the deletion process
+    local start_time end_time
+    start_time=$(date +%s.%N)
+    $SCRIPT delete "$TEST_DIR"/test_file_*.txt > /dev/null 2>&1
+    end_time=$(date +%s.%N)
+    delete_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    echo -e "${BLUE}Performance Result:${NC}"
+    echo "  Files deleted: $file_count"
+    echo -e "  Time taken: $(format_time "$delete_time")"
+    
+    if (( $(echo "$delete_time > 0" | bc -l 2>/dev/null) )); then
+        local avg_time
+        avg_time=$(echo "$delete_time / $file_count" | bc -l)
+        echo -e "  Average time per file: $(format_time "$avg_time")"
+    fi
+    
+    # Verify deletion was successful
+    local remaining_files
+    remaining_files=$(find "$TEST_DIR" -name "test_file_*.txt" | wc -l)
+    if [ "$remaining_files" -eq 0 ]; then
+        echo -e "${GREEN}✓ SUCCESS: All files deleted${NC}"
+    else
+        echo -e "${RED}✗ FAIL: $remaining_files files remaining${NC}"
+    fi
+    
+    teardown
+    echo ""
+}
+
+performance_list_100_items() {
+    echo "=== Performance Test: List Recycle Bin with 100+ Items ==="
+    setup
+    
+    # Create and delete 100+ files to populate recycle bin
+    echo "Populating recycle bin with 100+ items..."
+    local created_count=0
+    for i in {1..105}; do
+        echo "content $i" > "$TEST_DIR/list_file_$i.txt"
+        if $SCRIPT delete "$TEST_DIR/list_file_$i.txt" > /dev/null 2>&1; then
+            ((created_count++))
+        fi
+    done
+    
+    echo "Successfully added $created_count items to recycle bin"
+    
+    # Verify items are in recycle bin
+    if [ -f "$METADATA_FILE" ]; then
+        local item_count
+        item_count=$(tail -n +3 "$METADATA_FILE" 2>/dev/null | wc -l)
+        echo "Current items in recycle bin: $item_count"
+    fi
+    
+    # Measure list time with more precise timing
+    echo "Starting list operation..."
+    local start_time end_time
+    start_time=$(date +%s.%N)
+    $SCRIPT list > /dev/null 2>&1
+    end_time=$(date +%s.%N)
+    list_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    echo -e "${BLUE}Performance Result:${NC}"
+    echo "  Items in bin: $created_count"
+    echo -e "  Time taken: $(format_time "$list_time")"
+    
+    # Quick verification that list works
+    if [ -f "$METADATA_FILE" ] && [ -s "$METADATA_FILE" ]; then
+        echo -e "${GREEN}✓ SUCCESS: List operation completed${NC}"
+    else
+        echo -e "${YELLOW}⚠ WARNING: Metadata file issues${NC}"
+    fi
+    
+    teardown
+    echo ""
+}
+
+performance_search_large_metadata() {
+    echo "=== Performance Test: Search in Large Metadata File ==="
+    setup
+    
+    # Create a large number of files to make metadata file substantial
+    echo "Creating large metadata file with 200+ entries..."
+    local added_count=0
+    for i in {1..205}; do
+        echo "search_content_$i" > "$TEST_DIR/search_file_$i.txt"
+        if $SCRIPT delete "$TEST_DIR/search_file_$i.txt" > /dev/null 2>&1; then
+            ((added_count++))
+        fi
+    done
+    
+    echo "Added $added_count entries to metadata"
+    
+    # Get metadata file size
+    local metadata_size=0
+    if [ -f "$METADATA_FILE" ]; then
+        metadata_size=$(wc -l < "$METADATA_FILE" 2>/dev/null || echo "0")
+        echo "Metadata file size: $metadata_size lines"
+    fi
+    
+    # Measure search time for different patterns with individual timing
+    echo "Testing search performance..."
+    
+    # Search for specific file
+    local start_time end_time
+    start_time=$(date +%s.%N)
+    $SCRIPT search "search_file_150" > /dev/null 2>&1
+    end_time=$(date +%s.%N)
+    search_specific_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    # Search with wildcard
+    start_time=$(date +%s.%N)
+    $SCRIPT search "search_file_1*" > /dev/null 2>&1
+    end_time=$(date +%s.%N)
+    search_wildcard_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    # Search for extension
+    start_time=$(date +%s.%N)
+    $SCRIPT search "*.txt" > /dev/null 2>&1
+    end_time=$(date +%s.%N)
+    search_ext_time=$(echo "$end_time - $start_time" | bc -l)
+    
+    echo -e "${BLUE}Performance Results:${NC}"
+    echo "  Metadata entries: $((metadata_size - 2))"
+    echo -e "  Specific search time: $(format_time "$search_specific_time")"
+    echo -e "  Wildcard search time: $(format_time "$search_wildcard_time")"
+    echo -e "  Extension search time: $(format_time "$search_ext_time")"
+    
+    # Verify at least one search found something
+    if $SCRIPT search "search_file_1" 2>/dev/null | grep -q "search_file"; then
+        echo -e "${GREEN}✓ SUCCESS: Search operations completed${NC}"
+    else
+        echo -e "${YELLOW}⚠ WARNING: Search may not be working correctly${NC}"
+    fi
+    
+    teardown
+    echo ""
+}
+
+performance_restore_many_items() {
+    echo "=== Performance Test: Restore from Bin with Many Items ==="
+    setup
+    
+    # Create and delete files, keeping track of some IDs for restoration
+    echo "Setting up recycle bin with 100+ items..."
+    local restore_ids=()
+    local added_count=0
+    
+    for i in {1..105}; do
+        echo "restore_content_$i" > "$TEST_DIR/restore_file_$i.txt"
+        if $SCRIPT delete "$TEST_DIR/restore_file_$i.txt" > /dev/null 2>&1; then
+            ((added_count++))
+            # Store every 10th file ID for restoration test
+            if [ $((i % 10)) -eq 0 ] && [ -f "$METADATA_FILE" ]; then
+                local id
+                id=$(grep "restore_file_$i.txt" "$METADATA_FILE" 2>/dev/null | cut -d',' -f1 | head -1)
+                if [ -n "$id" ]; then
+                    restore_ids+=("$id")
+                    echo "Stored ID for restoration: $id"
+                fi
+            fi
+        fi
+    done
+    
+    echo "Added $added_count items to recycle bin"
+    echo "Items ready for restoration: ${#restore_ids[@]}"
+    
+    # Measure restoration time for multiple files
+    if [ ${#restore_ids[@]} -gt 0 ]; then
+        echo "Testing restoration performance..."
+        
+        # Test restoring first 3 files and measure time
+        local total_restore_time=0
+        local successful_restores=0
+        
+        for i in {0..2}; do
+            if [ -n "${restore_ids[$i]}" ]; then
+                echo "Restoring file with ID: ${restore_ids[$i]}"
+                
+                # Time the restoration
+                local start_time end_time restore_time
+                start_time=$(date +%s.%N)
+                # Use yes to automatically confirm any prompts
+                echo "y" | $SCRIPT restore "${restore_ids[$i]}" > /dev/null 2>&1
+                end_time=$(date +%s.%N)
+                restore_time=$(echo "$end_time - $start_time" | bc -l)
+                
+                if (( $(echo "$restore_time > 0" | bc -l 2>/dev/null) )); then
+                    total_restore_time=$(echo "$total_restore_time + $restore_time" | bc -l)
+                    ((successful_restores++))
+                    echo -e "  File $((i+1)): $(format_time "$restore_time")"
+                else
+                    echo -e "  ${YELLOW}File $((i+1)): Timing too short to measure accurately${NC}"
+                fi
+            fi
+        done
+        
+        if [ "$successful_restores" -gt 0 ]; then
+            local avg_restore_time
+            avg_restore_time=$(echo "$total_restore_time / $successful_restores" | bc -l)
+            
+            echo -e "${BLUE}Performance Results:${NC}"
+            echo "  Files restored: $successful_restores"
+            echo -e "  Total restoration time: $(format_time "$total_restore_time")"
+            echo -e "  Average time per file: $(format_time "$avg_restore_time")"
+            echo -e "${GREEN}✓ SUCCESS: Restoration performance test completed${NC}"
+        else
+            echo -e "${YELLOW}⚠ WARNING: No measurable restoration times recorded${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ WARNING: No valid IDs found for restoration test${NC}"
+    fi
+    
+    teardown
+    echo ""
+}
+
+
+
 # Run all tests
 echo "========================================="
 echo " Recycle Bin Test Suite"
@@ -332,6 +606,12 @@ test_auto_cleanup
 test_statistics_display
 test_file_with_spaces
 test_permission_handling
+
+
+performance_delete_100_files
+performance_list_100_items
+performance_search_large_metadata
+performance_restore_many_items
 
 teardown
 
