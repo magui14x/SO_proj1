@@ -155,18 +155,7 @@ delete_file() {
   }
 
 
-#################################################
-# Function: list_recycled
-# Description: Lists all items in recycle bin
-# Parameters: None
-# Returns: 0 on success
-#################################################
-#################################################
-# Function: list_recycled
-# Description: Lists all items in recycle bin
-# Parameters: --detailed for detailed view
-# Returns: 0 on success
-#################################################
+
 #################################################
 # Function: list_recycled
 # Description: Lists all items in recycle bin
@@ -655,66 +644,91 @@ restore_file() {
 # Returns: 0 on success
 #################################################
 empty_recyclebin() {
-  # TODO: Implement this function
-  local deletionFile="$1" 
-  local index=1
-  
-  matches=()
+  local target="$1"
+  local force=false
 
-  if [[ -z "$deletionFile" ]];then #Checks for arguments. If it doesn't have any args it will ask to delete everything.
-  echo "Are you sure? Type yes to erase all the files. "
-  read  -r REPLY
-    if [[ "$REPLY" == "yes" ]]; then
-  for  file in $FILES_DIR/*; do
-    rm -rf $file
-  done
-  echo "All files have been deleted. "
-  echo "# Recycle Bin Metadata" > "$METADATA_FILE"
-  echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" >> "$METADATA_FILE"
-  else 
-  echo "Operation canceled. Exiting... "
-  exit 1
+  # Verifica se o argumento é --force
+  if [[ "$target" == "--force" ]]; then
+    force=true
+    target=""
   fi
 
-  else
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - EMPTY: Operation started" >> "$LOG_FILE"
 
-  while IFS=',' read -r id name path date size type perms owner; do
-  matches+=("$id,$name,$path,$date,$size,$type,$perms,$owner")
-    echo "[$index] ID: $id | Name: $name | Deleted on: $date | Size: ${size}B | Type: $type"
-    ((index++))
-  done < <(grep ",$deletionFile," "$METADATA_FILE" )
-
-   if [ "${#matches[@]}" -eq 0 ]; then
-      echo "No matching files found."
-      return 1
+  # MODO 1: Apagar tudo
+  if [[ -z "$target" ]]; then
+    if [ "$force" = false ]; then
+      echo -e "${YELLOW}Are you sure you want to permanently delete ALL files in the recycle bin?${NC}"
+      read -rp "Type 'yes' to confirm: " REPLY
+      if [[ "$REPLY" != "yes" ]]; then
+        echo "Operation cancelled."
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - CANCELLED: User aborted full deletion" >> "$LOG_FILE"
+        return 1
+      fi
     fi
 
-  echo "Choose the index of the file you want to delete. Anything else to cancel. "
-  read -r selection
+    local total_deleted=0
+    for file in "$FILES_DIR"/*; do
+      [ -e "$file" ] || continue
+      rm -rf "$file"
+      ((total_deleted++))
+    done
 
-  if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#matches[@]}" ]; then
-    echo "Invalid selection."
+    # Reset metadata
+    echo "# Recycle Bin Metadata" > "$METADATA_FILE"
+    echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" >> "$METADATA_FILE"
+
+    echo -e "${GREEN}All files permanently deleted (${total_deleted} items).${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETED: All files purged from recycle bin (${total_deleted} items)" >> "$LOG_FILE"
+    return 0
+  fi
+
+  # MODO 2: Apagar item específico por nome ou ID
+  local matches=()
+  local index=1
+
+  while IFS=',' read -r id name path date size type perms owner; do
+    if [[ "$id" == "$target" || "$name" == "$target" ]]; then
+      matches+=("$id,$name,$path,$date,$size,$type,$perms,$owner")
+      echo "[$index] ID: $id | Name: $name | Deleted on: $date | Size: ${size}B | Type: $type"
+      ((index++))
+    fi
+  done < <(tail -n +3 "$METADATA_FILE")
+
+  if [ "${#matches[@]}" -eq 0 ]; then
+    echo -e "${RED}No matching files found for '$target'${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: No match found for '$target'" >> "$LOG_FILE"
     return 1
   fi
 
-  selected="${matches[$((selection-1))]}"
+  echo ""
+  echo "Choose the index of the file you want to permanently delete. Anything else to cancel."
+  read -rp "Selection: " selection
+
+  if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#matches[@]}" ]; then
+    echo "Invalid selection. Operation cancelled."
+    return 1
+  fi
+
+  local selected="${matches[$((selection-1))]}"
   IFS=',' read -r id name path date size type perms owner <<< "$selected"
-    
   local full_name="${name}_${id}"
   local full_path="$FILES_DIR/$full_name"
-  if [ -e "$full_path" ]; then
-    rm -rf "$full_path"
-    grep -v "$id" "$METADATA_FILE" > "$METADATA_FILE.tmp" && mv "$METADATA_FILE.tmp" "$METADATA_FILE" 
-  fi
-  echo "The file : "$deletionFile" with the ID: "${id}", has been deleted. "
-  return 1
-  fi
- 
 
-  # Your code here
-  # Hint: Ask for confirmation
-  # Hint: Delete all files in FILES_DIR
-  # Hint: Reset metadata file
+  if [ -e "$full_path" ]; then
+    if rm -rf "$full_path"; then
+      grep -v "^$id," "$METADATA_FILE" > "$METADATA_FILE.tmp" && mv "$METADATA_FILE.tmp" "$METADATA_FILE"
+      echo -e "${GREEN}File '$name' (ID: $id) permanently deleted.${NC}"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - DELETED: File '$name' (ID: $id) permanently removed" >> "$LOG_FILE"
+    else
+      echo -e "${RED}Error: Failed to delete file '${full_name}'${NC}"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Failed to delete '$full_name'" >> "$LOG_FILE"
+      return 1
+    fi
+  else
+    echo -e "${YELLOW}Warning: File not found in recycle bin${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - WARNING: File '$full_name' missing during deletion" >> "$LOG_FILE"
+  fi
 
   return 0
 }
@@ -727,44 +741,60 @@ empty_recyclebin() {
 #################################################
 search_recycled() {
   shopt -s nocasematch
-  # TODO: Implement this function
   local pattern="$1"
-  matches=()
   local found=0
+  local index=1
 
-  if [[ -z "$pattern" ]];then #Checks for arguments. If it doesn't have any args it will ask to delete everything.
-  echo "No pattern or name. "
-  return 1
+  if [[ -z "$pattern" ]]; then
+    echo -e "${RED}Error: No search pattern provided${NC}"
+    return 1
   fi
 
-  if [[ "$pattern" == \*.* ]]; then
-    local extension="${pattern#*.}"  
-      while IFS=',' read -r id name path date size type perms owner; do
-      local regex="\.${extension}$"
-      if [[ "$name" =~ $regex ]]; then  
-        echo "ID: $id | Name: $name | Deleted on: $date | Original Path: ${path} | Type: $type"     
-        found=1
-        fi    
-    done < <(tail -n +3 "$METADATA_FILE" )
-  else
-      while IFS=',' read -r id name path date size type perms owner; do
-      if [[ "$name" =~ $pattern || "$path" =~ $pattern ]]; then  
-        echo "ID: $id | Name: $name | Deleted on: $date | Original Path: ${path} | Type: $type"     
-        found=1
-        fi    
-    done < <(tail -n +3 "$METADATA_FILE" )
+  if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
+    echo -e "${YELLOW}Recycle bin is empty or not initialized${NC}"
+    return 1
   fi
 
-    if [[ "$found" -eq 0 ]]; then
-      echo "No matching files found."
-      return 1
+  echo "=== Search Results for pattern: '$pattern' ==="
+  printf "%-5s %-20s %-50s %-25s %-15s %-10s\n" "IDX" "NAME" "ORIGINAL PATH" "DELETION DATE" "TYPE" "ID"
+  printf "%-5s %-20s %-50s %-25s %-15s %-10s\n" "----" "--------------------" "--------------------------------------------------" "-------------------------" "---------------" "----------"
+
+  while IFS=',' read -r id name path date size type perms owner; do
+    # Skip header lines
+    [[ "$id" =~ ^# || "$id" == "ID" || -z "$id" ]] && continue
+
+    # Clean fields
+    name=$(echo "$name" | xargs)
+    path=$(echo "$path" | xargs)
+    type=$(echo "$type" | sed 's/^"//;s/"$//')
+
+    # Match by extension or pattern
+    if [[ "$pattern" == \*.* ]]; then
+      local ext="${pattern#*.}"
+      if [[ "$name" =~ \.${ext}$ ]]; then
+        printf "%-5s %-20s %-50s %-25s %-15s %-10s\n" "$index" "$name" "$path" "$date" "$type" "$id"
+        ((index++))
+        found=1
+      fi
+    else
+      if [[ "$name" =~ $pattern || "$path" =~ $pattern ]]; then
+        printf "%-5s %-20s %-50s %-25s %-15s %-10s\n" "$index" "$name" "$path" "$date" "$type" "$id"
+        ((index++))
+        found=1
+      fi
     fi
-  
-  # Your code here
-  # Hint: Use grep to search metadata
+  done < <(tail -n +3 "$METADATA_FILE")
 
+  if [[ "$found" -eq 0 ]]; then
+    echo -e "${YELLOW}No matching files found for pattern: '$pattern'${NC}"
+    return 1
+  fi
+
+  echo ""
+  echo "Total matches: $((index - 1))"
   return 0
 }
+
 #################################################
 # Function: auto_cleanup
 # Description: Erases files before a determined date.
@@ -772,54 +802,71 @@ search_recycled() {
 # Returns: 0
 #################################################
 
-auto_cleanup(){
+auto_cleanup() {
   if [ ! -f "$CONFIG_FILE" ]; then
-    echo "No config file found. Skipping auto-cleanup."
+    echo -e "${YELLOW}No config file found. Skipping auto-cleanup.${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO_CLEANUP: Skipped due to missing config file" >> "$LOG_FILE"
     return 1
   fi
 
   local cleanup_days
-  cleanup_days=$(grep "^AUTO_CLEANUP_DAYS=" "$CONFIG_FILE"| cut -d '=' -f2) 
-  
+  cleanup_days=$(grep "^AUTO_CLEANUP_DAYS=" "$CONFIG_FILE" | cut -d '=' -f2)
+
   if ! [[ "$cleanup_days" =~ ^[0-9]+$ ]]; then
-    echo "Invalid AUTO_CLEANUP_DAYS value. "
+    echo -e "${RED}Invalid AUTO_CLEANUP_DAYS value in config.${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO_CLEANUP: Invalid retention value '$cleanup_days'" >> "$LOG_FILE"
     return 1
-  
   fi
-  
-    local present_date
-    present_date=$(date +%s)
-    local deleted_ids=()
 
-    while IFS=',' read -r id name path date size type perms owner; do
-      if ! deletion_date=$(date -d "$date" +%s 2>/dev/null); then
-        echo "Skipping entry with invalid date: $date"
-        continue
-      fi
-        
-      age_days=$(( (present_date - deletion_date) / 86400 ))
-      if [[ $age_days -ge $cleanup_days ]]; then
-        file_path="$FILES_DIR/${name}_${id}"
-        if [ -e "$file_path" ]; then
-          echo "The file : "$name" with the ID: "${id}", has been deleted. " 
-          deleted_ids+=("$id")
-          if [ -d "$file_path" ]; then
-            rmdir "$file_path" 2>/dev/null || rm -rf "$file_path"
-          else
-            rm -f "$file_path"
-          fi
-        fi    
-      fi
-    done < <(tail -n +3 "$METADATA_FILE" )
+  local present_date
+  present_date=$(date +%s)
+  local deleted_ids=()
+  local deleted_count=0
+  local total_freed=0
 
-    if [ "${#deleted_ids[@]}" -gt 0 ]; then
-    grep -v -E "^(${deleted_ids[*]// /|})," "$METADATA_FILE" > "$METADATA_FILE.tmp" && mv "$METADATA_FILE.tmp" "$METADATA_FILE"
+  while IFS=',' read -r id name path date size type perms owner; do
+    [[ "$id" =~ ^# || "$id" == "ID" || -z "$id" ]] && continue
+
+    if ! deletion_date=$(date -d "$date" +%s 2>/dev/null); then
+      echo -e "${YELLOW}Skipping entry with invalid date: $date${NC}"
+      continue
     fi
 
-    
+    local age_days=$(( (present_date - deletion_date) / 86400 ))
+    if [[ "$age_days" -ge "$cleanup_days" ]]; then
+      local file_path="$FILES_DIR/${name}_${id}"
+      if [ -e "$file_path" ]; then
+        echo -e "${GREEN}Deleted: '$name' (ID: $id), Age: ${age_days} days${NC}"
+        deleted_ids+=("$id")
+        ((deleted_count++))
+        ((total_freed+=size))
 
-    return 0
+        if [ -d "$file_path" ]; then
+          rmdir "$file_path" 2>/dev/null || rm -rf "$file_path"
+        else
+          rm -f "$file_path"
+        fi
+
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO_CLEANUP: Deleted '$name' (ID: $id)" >> "$LOG_FILE"
+      fi
+    fi
+  done < <(tail -n +3 "$METADATA_FILE")
+
+  if [ "${#deleted_ids[@]}" -gt 0 ]; then
+    grep -v -E "^(${deleted_ids[*]// /|})," "$METADATA_FILE" > "$METADATA_FILE.tmp" && mv "$METADATA_FILE.tmp" "$METADATA_FILE"
+  fi
+
+  # Summary
+  echo ""
+  echo "=== Auto-Cleanup Summary ==="
+  echo "Retention threshold: $cleanup_days days"
+  echo "Files deleted: $deleted_count"
+  echo "Space freed: $(numfmt --to=iec $total_freed)"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO_CLEANUP: Completed. Deleted $deleted_count files, freed $(numfmt --to=iec $total_freed)" >> "$LOG_FILE"
+
+  return 0
 }
+
 #################################################
 # Function: Show Statistics
 # Description: Shows recycle_bin information
@@ -885,33 +932,42 @@ display_help() {
 Linux Recycle Bin - Usage Guide
 
 SYNOPSIS:
-    $0 [OPTION] [ARGUMENTS]
+    $0 [COMMAND] [ARGUMENTS]
 
-OPTIONS:
-    delete <file>  | delete <file> <file> ...  Move file(s)/directory to recycle bin
-    list             List all items in recycle bin
-    restore <name or ID >     Restore file by name or ID. 
-    search <pattern> Search for files by name
-    empty            Empty recycle bin permanently
-    empty <name>     Shows a list of matching files (if there is any) and asks for a second
-                     index input to choose which to delete. 
-    help             Display this help message
-    auto             Remove files inside the trash bin older than the chosen amount of days. Beware the default is 30 days!!!
-    
+COMMANDS:
+    delete <file> [file ...]     Move one or more files/directories to the recycle bin
+    list                         List all items currently in the recycle bin
+    restore <name or ID>         Restore a file by its original name or unique ID
+    search <pattern>             Search for files by name or original path (supports wildcards)
+    empty                        Permanently delete all items in the recycle bin (confirmation required)
+    empty <name>                 Search for a file and choose which matching item to permanently delete
+    auto                         Automatically delete files older than the configured retention period
+    help                         Display this help message
+
+CONFIGURATION:
+    Settings are stored in:
+        $CONFIG_FILE
+
+    Key options include:
+        MAX_SIZE_MB           Maximum allowed size of recycle bin (in MB)
+        AUTO_CLEANUP_DAYS     Number of days before auto-deletion (default: 30)
+
 EXAMPLES:
-
     $0 delete myfile.txt
+    $0 delete file1.txt folder2/
     $0 list
     $0 restore 1696234567_abc123
+    $0 restore "report.docx"
     $0 search "*.pdf"
     $0 empty
-    
     $0 empty "test.txt"
-    
+    $0 auto
+    $0 help
 
 EOF
   return 0
 }
+
 
 #################################################
 # Function: main
