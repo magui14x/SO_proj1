@@ -387,7 +387,7 @@ list_recycled() {
     echo "Sorted by: $sort_by"
     echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
     
-    if (( $(echo "$usage_percent" > "90" | bc -l) )); then
+    if (( $(echo "$usage_percent" > 90 | bc -l) )); then
         echo -e "${YELLOW}Usage close to the limit, consider using auto_cleanup to erase old files${NC}"
     fi
 

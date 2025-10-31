@@ -226,11 +226,47 @@ After that, displays a summary of the information of all the files. Prints all t
 
 Checks if it has a search term, if the metadata file exists, and if the metadata is empty, returning 1 if it doesn't verify all those checks.
 
-From the search term, the code gets the id and the name of the first matching file. 
+From the search term, the code gets the id and the name of the first matching file. If it doesn't match anything with the search term, returns 1 and recommends using list.
 
+If it finds a metadata entry, parses it's fields "(IFS=',' read -r id original_name original_path deletion_date file_size file_type permissions owner <<< "$metadata_entry")" and stores it's values and prints them.
 
+It then looks for the physical file, using the ID in the new_name, and matches the type of file it is. It looks for the first matching instance of the search term. If it doesn't find the physical file, prints the error and returns 1.
 
+Checks for disk space in the original path, and stops the operation only if there isn't enough space.
 
+Then it has to check if the original directory still exists. If it doesn't, asks if the user wants to create that directory again. Here there are 3 possible paths:
+
+1- There is an error creating the directory, so it prints error message and returns.
+2- It creates the directory successfully, prints message and continues to move the file
+3-The file creation is canceled, prints the cancelling message and returns.
+
+If the directory already existed, but was read-only, it asks the user to see if he wishes to give it the necessary permissions to perform the restoration. If it fails to give the permissions, prints error message and returns. If the operation is cancelled prints the cancelling message and returns.
+
+After the directory check, it checks for the existence of a file with the same filename inside that directory. If there is, it makes a read,case that depends on 1 of 3 choices:
+1) Overwrite existing file
+2) Restore with modified name (append timestamp)
+3) Cancel operation
+*) Invalid choice
+
+1- If it is a directory and there is an error on removing the file prints error and returns. If it is a file and there is an error removing it prints an error and returns.
+
+2- It appends the name a timestamp, so it is unique, while also saving the file extension to place it only in the end of the new name.
+
+3- Cancels restoration, prints cancelled message, returns.
+
+*- Asks the user for a valid input.
+
+If there isn't a file in the original path with the same filename the function will proceed normally.
+
+Checks if the recycled_file can be moved to the destination, if not prints error and returns.
+
+Checks if the permissions are valid, to try to restore them. If it fails Prints warning saying that the permissions could not be restored, but continues the procedure as normal.
+
+To remove the metadata entry, it moves everything in the metadata, except the matching line ,to a temporary file. Then, overwrites the metadata with the information of this temporary file, destroying it in the  process. Which gives us the filtered out result. If it can't update the metadata, it issues a warning, and destroys the temp file (but this situation should be very rare). If it can't find the metadata entry issues a warning and destroys the temporary file.
+
+Also creates a Log entry stating the success of operation or if it failed before, it is also logged then.
+
+**Empty bin**
 
 
 ## Flowcharts for complex operations
