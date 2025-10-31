@@ -83,9 +83,9 @@ delete_file() {
   for file_path in "$@"; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Processing file: '$file_path'" >> "$LOG_FILE"
     #se for importante n apaga
-    if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" ]]; then
+    if [[ "$(basename "$file_path")" == "recycle_bin.sh" || "$file_path" == "$METADATA_FILE" || "$file_path" == "$RECYCLE_BIN_DIR" || "$file_path" == "$CONFIG_FILE" || "$file_path" == "$LOG_FILE" ]]; then
       echo -e "${RED}You can't erase this file.${NC} (It's... kind of important...)"
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Attempted to delete protected file: '$file_path'" >> "$LOG_FILE"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Attempted to delete protected file: '$file_path'" >> "$LOG_FILE" 
       continue
     fi
 
@@ -129,6 +129,7 @@ delete_file() {
   file_size=$(stat -c "%s" "$file_path")
   local file_type
   file_type=$(file -b "$file_path")
+  file_type="${file_type//[,]/}"
   local permissions
   permissions=$(stat -c "%a" "$file_path")
   local owner
@@ -202,8 +203,8 @@ list_recycled() {
     echo "=== Recycle Bin Contents ==="
 
     if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then
-        echo "Recycle bin is empty"
-        return 0
+        echo "Error: Metadata is absolutely empty"
+        return 1
     fi
 
     local total_items=$(($(wc -l < "$METADATA_FILE") - 2))
@@ -386,8 +387,8 @@ list_recycled() {
     echo "Sorted by: $sort_by"
     echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
     
-    if (( $(echo "$usage_percent > 100" | bc -l) )); then
-        echo -e "${YELLOW}Usage above the limit, consider using auto_cleanup to erase old files${NC}"
+    if (( $(echo "$usage_percent" > "90" | bc -l) )); then
+        echo -e "${YELLOW}Usage close to the limit, consider using auto_cleanup to erase old files${NC}"
     fi
 
     if [ "$detailed_mode" = false ]; then
@@ -920,6 +921,12 @@ show_statistics() {
   usage_percent=$(awk -v used="$total_size" -v max="$max_size_bytes" 'BEGIN {printf "%.2f", (used / max) * 100}')
   echo "Total size: $human_size"
   echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
+
+  if [ "$usage_percent" -gt 90 ]; then
+    echo "Usable space almost maxed, consider running auto_clean up to erase old files, or increasing the max space that the bin can use. "
+  elif [ "$usage_percent" -gt 100 ]; then
+    echo "Usage above 100%? How did you even do that?" 
+  fi
 
   # Breakdown by type
   dir_count=$(tail -n +3 "$METADATA_FILE" | awk -F',' '$6 ~ /directory/ {count++} END {print count+0}')

@@ -133,8 +133,104 @@ show_statistics() - Displays summary statistics about the recycle bin, including
 
 ## Design decisions and rationale
 
+**1. File Structure**
+The project required multiple tasks that compelled the creation of multiple files for configuration, and data storage.
+
+metadata.db - Created to hold data of each deleted file. Allowed manipulation and the search of files inside the bin.
+
+config - Holds certain values that can be changed to set the code to the users comfort.
+
+recyclebin.log - Holds the information of each operation realized.
+
+
+**2. UI**
+
+The User interface in this project is run in the terminal. We tried to adapt everything for a comprehensive view of the information displayed. 
+We used a table-like view for the list, a simple but detailed description of the performed action before and after it is complete to allow the user to understand what happens through each command. The creation of the help command also intends to allow a better understanding of each command.
+
+**3.Error Handling**
+
+The majority of error handling is solved by an "if check" that verifies a specific situation. It allows for simple exits in case it finds a situation that can't handle. Also there are some other cases, like the "flock" that cancels operations when there are multiple concurrent.
+
+**4. Size Limit Handling**
+
+The size limit placed on the recycle_bin is checked in multiple functions.
+
+Delete - Doesn't let the user delete a file if this action will surpass the size limit inside the bin.
+
+List and Stats - Check for the current use of the space and, if it is close to the limit it will advise the user to take action.
+
+**5. Returns**
+When the code succeeds it returns 0, else it return 1.
 
 ## Algorithm explanations
+![Initialize Bin Code](Code_screenshots/initialize_bin_code.png) 
+![Check disk space](Code_screenshots/Check_space.png) 
+
+**Initialize recycle_bin** 
+
+With just a few changes from the template, we added the creation of the config file that stores the values for MAX_SIZE_MB and AUTO_CLEANUP_DAYS, and the creation of recyclebin.log, which allows us to store information about each operation. On the first initialization of the bin, the operation is recorded in the log.
+
+**Generate unique ID**
+
+Attaching the timestamp of the function call with 6 random characters it generates an unique ID.
+
+**Check disk space**
+
+This function was created to allow the calculation of the current occupied space, which is then compared with the allowed space in MAX_SIZE_MB. We believe it simplifies the process of obtaining that value, which is later used to calculate usage percentage in the list and statistics functions.
+
+
+**Delete File**
+In the delete file function, we created several validations to ensure that the file is handled according to its characteristics.
+
+First, in the block with if [ "$#" -eq 0 ]; then, we check for the presence of arguments. This prevents the code from running if none are provided.
+
+With for file_path in "$@"; do, we start a for loop that goes through each argument. This seemed like the best choice since it can handle any number of arguments, whether one or many.
+
+We check that none of the arguments are files that are part of the project (for example: if one of the arguments is $RECYCLE_BIN_DIR, which would be the bin directory, that argument is ignored, and a warning message is shown for attempting to delete an important file).
+
+if [ ! -e "$file_path" ]; then ensures that the file exists.
+
+if [ -L "$file_path" ]; then allows us to detect a symbolic link file, but we ended up not implementing its handling correctly.
+
+if [[ -d "$file_path" && ! -L "$file_path" ]]; then ensures that we're working with a non-symbolic directory, so we can recursively delete its contents if there are any.
+
+Then we have a block that uses stat, file, and generate_unique_ to create metadata for each argument being processed. It also creates a new name for the file by joining the old name with the ID.
+
+Immediately after, we calculate the current usage of bin space, which allows us to prevent deletion of a file if it would exceed MAX_SIZE_MB.
+
+exec 200>>"$METADATA_FILE" flock -n 200 || {...} is a measure used to prevent two processes from running at the same time. It allows the first process that reaches this point to block the second. This is an extreme measure, but it ensures that files aren’t duplicated if two processes with the same argument are run simultaneously.
+
+Then it tries to move the file to the bin. This can fail if the process doesn’t have permission to move the file.
+
+**List recycled**
+First off, "if [[ "$1" == "--detailed" || "$1" == "-d" ]]; then" checks for the --detailed flag. 
+
+Then, checks to see if the metadata is empty. Counts the number of files, and  if "[ "$total_items" -eq 0 ]" it prints a message stating that the bin is empty.
+
+Calculates the total size of the files in the bin.
+
+After that, depending on if it had the detailed flag or not, it adjusts the display of information that the user will see.
+
+Check the sort_by, (which can be changed by doing an export RECYCLE_BIN_SORT_BY=name/size/date) to decide in what order to sort the data.
+
+The main difference between detailed and compact view is the information displayed.
+
+Detailed view creates an individual indexed table for each file with all the information in the metadata: id, name, path, deletion_date, size, type, permissions, owner. Also shows the name the file was stored with, converts the size from bytes to kB or MB (if it needs to) and shows a preview of the first line of the file.
+
+Compact view shows simply the ID, name, original path, size and deletion date.
+
+After that, displays a summary of the information of all the files. Prints all the files, total size, the sort key, and percent usage.
+
+**Restore file**
+
+Checks if it has a search term, if the metadata file exists, and if the metadata is empty, returning 1 if it doesn't verify all those checks.
+
+From the search term, the code gets the id and the name of the first matching file. 
+
+
+
+
 
 
 ## Flowcharts for complex operations
