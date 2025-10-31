@@ -1,7 +1,7 @@
 # Recycle Bin System - Test Results
 **Student Name:** Margarida Almeida Cardoso, Enrique Alejandro Iriza de Ornelas 
 **Student ID:** 125799, 124762
-**Date:** [YYYY-MM-DD]
+**Date:** [2025-10-31]
 **Script Version:** 2.0
 ---
 ## Test Summary

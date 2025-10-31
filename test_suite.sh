@@ -1,5 +1,11 @@
 #!/bin/bash
 
+#################################################
+# Linux Recycle Bin Tests
+# Author: Enrique Ornelas, Margarida Almeida
+# Date: 2025-10-31
+#################################################
+
 # Global Configuration
 RECYCLE_BIN_DIR="$HOME/.recycle_bin"
 FILES_DIR="$RECYCLE_BIN_DIR/files"

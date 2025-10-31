@@ -1,7 +1,7 @@
 #################################################
 # Linux Recycle Bin Simulation
 # Author: Enrique Ornelas, Margarida Almeida
-# Date: [Date]
+# Date: 2025-10-31
 # Description: Shell-based recycle bin system
 #################################################
 
