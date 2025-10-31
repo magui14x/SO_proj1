@@ -268,5 +268,22 @@ Also creates a Log entry stating the success of operation or if it failed before
 
 **Empty bin**
 
+Checks if the argument is the flag --force. If it is, changes the target to "" and makes the variable "force" true (é uma ferramenta surpresa que nos ajudará mais tarde).
+
+If there was no argument, it will ask for confirmation before trying to delete every file. If the variable "force" has the value true, it will not ask for confirmation before deleting all the files inside the recycle bin.
+
+It resets the metadata and prints the success message, while also logging the procedure.
+
+If there was an argument in the function call that wasn't the flag, it will look for the lines in the metadata that match the search term, while also storing the matches. And printing the matches with an incremental index attached.
+
+If the number of matches is zero, it will print the error of no matches and return.
+
+It will wait for the user to select the index of the file that he intends to delete. If the Index isn't one of the choices the operation will be canceled.
+
+If the input matches one of the indexes, it will start working with it.
+
+It will find the entry in the metadata, delete it through the same method that was used on the restore function, but only if it is able to remove the file itself, with rm -rf. If it wasn't able to delete the file it prints an error message and returns. If the physical file didn't exist at all, It will print the warning not found and it will return.
+
+
 
 ## Flowcharts for complex operations
