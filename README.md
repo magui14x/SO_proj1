@@ -68,14 +68,21 @@ eg. ./recycle_bin.sh help
 ## Features
 ### Core Features
 -Feature 1: Initialize Recycle Bin
+
 -Feature 2: Delete Files/Directories
+
 -Feature 3: List Recycle Bin Contents
+
 -Feature 4: Restore Files
+
 -Feature 5: Search Files
+
 -Feature 6: Empty Recycle Bin
+
 -Feature 7: Help System
 ### Extra Features
 -Feature 8: Statistics Dashboard
+
 -Feature 9: Auto-Cleanup
 
 ## Configuration

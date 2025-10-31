@@ -966,6 +966,8 @@ COMMANDS:
     empty <name>                 Search for a file and choose which matching item to permanently delete
     auto                         Automatically delete files older than the configured retention period
     help                         Display this help message
+    stats                        Shows extra information about the files in the recycle bin.
+
 
 CONFIGURATION:
     Settings are stored in:
