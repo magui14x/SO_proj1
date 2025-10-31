@@ -331,6 +331,4 @@ Last it checks for the validity of the file count to avoid dividing by zero when
 Formats the average for a easier read and then it prints the average file size.
 
 
-
-
 ## Flowcharts for complex operations

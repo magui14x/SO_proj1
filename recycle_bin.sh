@@ -387,7 +387,7 @@ list_recycled() {
     echo "Sorted by: $sort_by"
     echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
     
-    if (( $(echo "$usage_percent" > 90 | bc -l) )); then
+    if [ "$usage_percent" -gt 90 ]; then
         echo -e "${YELLOW}Usage close to the limit, consider using auto_cleanup to erase old files${NC}"
     fi
 
@@ -903,7 +903,7 @@ show_statistics() {
   
   if [ ! -f "$METADATA_FILE" ] || [ "$(wc -l < "$METADATA_FILE")" -le 1 ]; then
     echo "Recycle bin is empty."
-    return 0
+    return 1
   fi
 
   echo "📊 Recycle Bin Statistics"
@@ -921,9 +921,9 @@ show_statistics() {
   echo "Percentage usage: ${usage_percent}% of ${max_size_mb}MB"
 
   if [ "$usage_percent" -gt 90 ]; then
-    echo "Usable space almost maxed, consider running auto_clean up to erase old files, or increasing the max space that the bin can use. "
+    echo -e "${YELLOW}Usable space almost maxed, consider running auto_clean up to erase old files, or increasing the max space that the bin can use.${NC} "
   elif [ "$usage_percent" -gt 100 ]; then
-    echo "Usage above 100%? How did you even do that?" 
+    echo "${RED}Usage above 100%? How did you even do that?${NC}" 
   fi
 
   # Breakdown by type

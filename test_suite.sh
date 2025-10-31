@@ -233,7 +233,7 @@ test_empty_specific_file() {
         { 
             echo "1"    # Selecionar o primeiro ficheiro da lista
             sleep 1
-            echo "n"    # Cancelar para segurança (ou "y" para confirmar)
+            echo "y"    # Cancelar para segurança (ou "y" para confirmar)
         } | timeout 10s $SCRIPT empty "simple_test.txt" > /dev/null 2>&1
         
         exit_code=$?
