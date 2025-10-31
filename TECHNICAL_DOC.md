@@ -21,8 +21,8 @@ Enrique Alejandro Iriza de Ornelas - 124762
 ![Data Flow Diagrams](diagrams/dataflow_search.png)
 
 ### `empty_recyclebin()`
-![Data Flow Diagrams](diagrams/dataflow_empty.png)
-
+![Data Flow Diagrams](diagrams/dataflow_empty_specific.png)
+![Data Flow Diagrams](diagrams/dataflow_empty_entire.png)
 ## Metadata schema explanation
 
 The file metadata.db, located inside the .recycle_bin directory, stores all information about files in the recycle bin. The metadata.db file is a crucial element of the system because all recycle bin components depend on it to function properly.
