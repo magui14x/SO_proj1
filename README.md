@@ -13,9 +13,12 @@ Instruction to make the script executable:
 
 ## Usage
 To use the recycle bin system, run the script followed by one of the supported commands. Below are examples of each feature:
+
 ##### - Delete files or directories
 eg. ./recycle_bin.sh delete myfile.txt
     ./recycle_bin.sh delete file1.txt folder1/
+
+---
 
 ##### - List contents of the recycle bin
 eg. ./recycle_bin.sh list #compact table view
@@ -26,28 +29,41 @@ eg. export RECYCLE_BIN_SORT_BY=name   # Sort by name
     export RECYCLE_BIN_SORT_BY=size   # Sort by size
     export RECYCLE_BIN_SORT_BY=date   # Sort by deletion date (default)
 
+---
+
 ##### - Restore a file
 eg. ./recycle_bin.sh restore ID
     ./recycle_bin.sh restore "report.docx"
 
+---
+
 ##### - Search for files
 eg. ./recycle_bin.sh search "report"
     ./recycle_bin.sh search "*.pdf"
+
+---
 
 ##### - Empty the recycle bin
 eg. ./recycle_bin.sh empty                # Interactive full deletion
     ./recycle_bin.sh empty "myfile.txt"  # Delete specific item by name or ID
     ./recycle_bin.sh empty --force       # Force delete all without confirmation
 
+---
+
 ##### - Auto-cleanup
 eg. ./recycle_bin.sh auto
+
+---
 
 ##### - Show statistics
 eg. ./recycle_bin.sh stats
 
+---
+
 ##### - Help
 eg. ./recycle_bin.sh help
 
+---
 
 ## Features
 ### Core Features
@@ -71,9 +87,16 @@ Available Settings:
 
 How to Edit these settings?
 Run any of the recycle_bin features:
-eg: ./recycle_bin.sh help
+eg: 
+```bash
+./recycle_bin.sh help
+```
+
 Open the configuration file with a text editor:
-eg: nano ~/.recycle_bin/config
+eg: 
+```bash
+nano ~/.recycle_bin/config
+```
 And edit it!
 
 
@@ -284,12 +307,34 @@ This command will give a usage guide for your project.
 ```
 ![Help operation](screenshots/help.png)
 ## Known Issues
-[Any limitations or bugs]                                   TESTING.MD AS IT! GO GET IT
+### Issue 1: Symbolic Link Handling
+- **Description:** Symbolic links are handled with the name of the target file.
+- **Impact:** Medium
+- **Workaround:** Restore the file with a different new name.
+- **Plan:** Will implement in future version
+
+### Issue 2: Very Long Filenames
+- **Description:** Filenames over 255 characters cause truncation in dis-
+play
+- **Impact:** Low (display only, functionality works)
+- **Workaround:** Use ID for operations
+- **Plan:** Implement better truncation algorithm
+
+### Issue 3: Restoration of original permissions of a read-only directory 
+- **Description:** When we restore a file to a read only directory we change it's permissions to read and write, but don't restore the permissions to read-only.
+- **Impact:** Medium
+- **Workaround:** None currently
+- **Plan:** Implement a better restoration method.
+
+### Issue 4: Handling Commas
+- **Description:** Due to the CSV base of metadata we ended up removing the commas when they are in a filename. The file doesn't lose any information, just changes the filename.
+- **Impact:** Low
+- **Workaround:** None currently
+- **Plan:** Implement a better regex.
 
 ## References
-#### External code snippets
-#(>3 lines): Cite the source – IEEE template              INSERT AS FONTES!!!!!!!!!!!!!!!!!!
 ### AI assistance
-#Mention in README which parts were assisted
+We used AI assistance for error handling optimization, command explanation generation, and debugging complex shell scripting scenarios. 
 ### Online resources
-#List in references section – IEEE template
+The primary online resource consulted throughout development was Stack Overflow (stackoverflow.com).
+Command usage and syntax were verified using the Linux manual pages system via the man command.
