@@ -785,8 +785,6 @@ search_recycled() {
   printf "%-5s %-20s %-50s %-25s %-15s %-10s\n" "----" "--------------------" "--------------------------------------------------" "-------------------------" "---------------" "----------"
 
   while IFS=',' read -r id name path date size type perms owner; do
-    # Skip header lines
-    [[ "$id" =~ ^# || "$id" == "ID" || -z "$id" ]] && continue
 
     # Clean fields
     name=$(echo "$name" | xargs)

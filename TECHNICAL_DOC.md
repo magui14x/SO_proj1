@@ -164,8 +164,6 @@ List and Stats - Check for the current use of the space and, if it is close to t
 When the code succeeds it returns 0, else it return 1.
 
 ## Algorithm explanations
-![Initialize Bin Code](Code_screenshots/initialize_bin_code.png) 
-![Check disk space](Code_screenshots/Check_space.png) 
 
 **Initialize recycle_bin** 
 
@@ -283,6 +281,22 @@ It will wait for the user to select the index of the file that he intends to del
 If the input matches one of the indexes, it will start working with it.
 
 It will find the entry in the metadata, delete it through the same method that was used on the restore function, but only if it is able to remove the file itself, with rm -rf. If it wasn't able to delete the file it prints an error message and returns. If the physical file didn't exist at all, It will print the warning not found and it will return.
+
+
+**Search Bin**
+
+If it doesn't receive a pattern, prints the error no pattern provided and returns.
+
+If it doesn't find the metadata file issues a warning and returns.
+
+If it checks the normal boxes, it prints a header, and then parses de files. It first checks what type of pattern was given. It checks if starts with "*." so it can look for the extension that follows after. If it finds a match, it prints it's information, indexes it, counts the matches and changes the variable to found. 
+
+Similar thing in case it is looking for the name or path. If it finds a match, it prints it's information, indexes it, counts the matches and changes the variable to found. 
+
+If found = 0 issue warning and return.
+
+**Auto Cleanup**
+
 
 
 
