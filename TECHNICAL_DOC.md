@@ -314,5 +314,23 @@ In the end writes a summary containing the cleanup days, the deleted files count
 
 **Statistics**
 
+Checks for the existence of a metadata file. Returns if is empty.
+
+Counts total number of items, and the total size of those files combined.
+It translates them to a easier to read format. It calculates the percentage of use by dividing the total size  by the MAX_SIZE_MB from the config file.
+
+Checks if the percentage is almost full, printing a simple message in the terminal about it.
+Checks for the directory type entries in the metadata to get their amount.
+Subtracts the total amount of items by the total amount of directories and it gets the number of files.
+Prints those values.
+
+Then checks the age the files and stores the head and the tail, that being the oldest and the newest respectively.
+
+Last it checks for the validity of the file count to avoid dividing by zero when we calculate the average size of each file. (Divide by only the file number).
+
+Formats the average for a easier read and then it prints the average file size.
+
+
+
 
 ## Flowcharts for complex operations
