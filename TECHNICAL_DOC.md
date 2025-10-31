@@ -8,6 +8,9 @@ Enrique Alejandro Iriza de Ornelas - 124762
 
 
 ## Data flow diagrams
+### `initialize_file()`
+![Data Flow Diagrams](diagrams/dataflow_initialize.png)
+
 ### `delete_file()`
 ![Data Flow Diagrams](diagrams/dataflow_delete.png)
 
