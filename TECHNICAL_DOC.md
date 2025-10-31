@@ -25,6 +25,33 @@ Enrique Alejandro Iriza de Ornelas - 124762
 
 ## Metadata schema explanation
 
+The file metadata.db, located inside the .recycle_bin directory, stores all information about files in the recycle bin. The metadata.db file is a crucial element of the system because all recycle bin components depend on it to function properly.
+
+#### Metadata Fields
+There are eight metadata fields:
+
+-ID: Unique identifier (timestamp_randomstring format)
+-ORIGINAL_NAME: Original filename or directory name
+-ORIGINAL_PATH: Complete absolute path of original location
+-DELETION_DATE: Timestamp when deleted (YYYY-MM-DD HH:MM:SS)
+-FILE_SIZE: Size in bytes
+-FILE_TYPE: Either "file" or "directory"
+-PERMISSIONS: Original permission bits
+-OWNER: Original owner and group
+
+#### Delimiter and Structure
+All fields are divided by a comma (,) delimiter. The field order is defined in the metadata header:
+```text
+ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER
+```
+
+Example Metadata Line
+```text
+1696234567_abc123,document.txt,/home/user/Documents/document.txt,2024-10-02 14:30:22,4096,file,644,user:user
+```
+
+
+
 
 ## Function descriptions
 
