@@ -297,7 +297,22 @@ If found = 0 issue warning and return.
 
 **Auto Cleanup**
 
+Check for the existence of the config file.. If it doesn't exist, it issues a warning and returns.
 
+Checks for the variable auto-cleanup days in the config file to use it in the calculations.
+If that variable isn't valid, it prints an error and returns.
+
+The function gets the present date. Parses the metadata, skips header and entries without a valid deletion date (while issuing a warning) and selects the ones where the difference between the current date and the deletion date is bigger than the AUTO_CLEANUP_DAYS.
+
+If the current entry is an old file, it will count it for the deleted_count, and will also make a sum of the freed space after using the function.
+
+If the entry is a file, deletes it with rm -f. If it's a directory, deletes it with rmdir. 
+
+If there are deleted files it also deletes the metadata entry of each one, using the ID to find them.
+
+In the end writes a summary containing the cleanup days, the deleted files count and the total space freed.
+
+**Statistics**
 
 
 ## Flowcharts for complex operations

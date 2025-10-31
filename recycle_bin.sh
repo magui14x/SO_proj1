@@ -848,7 +848,7 @@ auto_cleanup() {
   local total_freed=0
 
   while IFS=',' read -r id name path date size type perms owner; do
-    [[ "$id" =~ ^# || "$id" == "ID" || -z "$id" ]] && continue
+    
 
     if ! deletion_date=$(date -d "$date" +%s 2>/dev/null); then
       echo -e "${YELLOW}Skipping entry with invalid date: $date${NC}"
